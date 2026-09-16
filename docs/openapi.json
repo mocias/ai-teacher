@@ -1,0 +1,2575 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Teacher Local API",
+    "version": "0.4.0",
+    "description": "仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:4317"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "UserSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "teacher_session"
+      },
+      "AgentBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/api/host/settings": {
+      "post": {
+        "summary": "配置 Codex 自动唤醒",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "executable": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "effort": {
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh"
+                    ]
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 1800
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/host/check": {
+      "post": {
+        "summary": "检查本机 Codex 登录状态",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/models/profile": {
+      "post": {
+        "summary": "保存 OpenAI 兼容模型连接；Key 只写不回显",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "base_url": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string",
+                    "writeOnly": true
+                  },
+                  "clear_key": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "object",
+                    "properties": {
+                      "temperature": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      },
+                      "max_tokens": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "timeout_seconds": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 180
+                      },
+                      "token_parameter": {
+                        "enum": [
+                          "max_tokens",
+                          "max_completion_tokens"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "base_url",
+                  "model"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/models/routes": {
+      "post": {
+        "summary": "为模块指定模型；profile_id=null 使用宿主",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "routes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "module": {
+                          "enum": [
+                            "chat",
+                            "material",
+                            "capabilities",
+                            "roadmap",
+                            "assessment",
+                            "review",
+                            "final"
+                          ]
+                        },
+                        "profile_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "module"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "routes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/models/enabled": {
+      "post": {
+        "summary": "启用或暂停 API 自动执行器",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/models/test": {
+      "post": {
+        "summary": "发出简短 API 连接测试（消耗供应商额度）",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/models/retry": {
+      "post": {
+        "summary": "显式重试或重新分配等待中的任务",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "enum": [
+                      "HOST",
+                      "API"
+                    ]
+                  },
+                  "profile_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "job_id",
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/capabilities/decide": {
+      "post": {
+        "summary": "确认或拒绝能力要求提案",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "accept"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/material-content": {
+      "post": {
+        "summary": "保存不可变的资料正文与范围",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource_id": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "resource_id",
+                  "scope",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      },
+      "get": {
+        "summary": "读取指定正文版本",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/assessments": {
+      "post": {
+        "summary": "发起结构化考察",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "INITIAL_DIAGNOSTIC",
+                      "MATERIAL_SUPPLEMENT",
+                      "INCREMENTAL_DIAGNOSTIC",
+                      "QUICK_CHECK",
+                      "LEARN",
+                      "REVIEW_DIAGNOSTIC",
+                      "REVIEW",
+                      "REINFORCEMENT",
+                      "ASSESSMENT_REVIEW",
+                      "NOTE_VERIFICATION",
+                      "FREE_TEST",
+                      "FINAL"
+                    ]
+                  },
+                  "mode": {
+                    "enum": [
+                      "OPEN_BOOK",
+                      "CLOSED_BOOK"
+                    ]
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "resource_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "parent_id": {
+                    "type": "string"
+                  },
+                  "gap_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "kind",
+                  "mode",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/assessments/end": {
+      "post": {
+        "summary": "用户提前结束考察，保留问答，不完成目标",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/gaps/route": {
+      "post": {
+        "summary": "用户选择缺口处理方向",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "IGNORED",
+                      "ROUTED_TO_REVIEW",
+                      "ROUTED_TO_LEARN"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/reviews": {
+      "post": {
+        "summary": "安排复习",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "gap_id": {
+                    "type": "string"
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "requirement_id",
+                  "due_date",
+                  "reason",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/reviews/start": {
+      "post": {
+        "summary": "开始或恢复复习考察",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "enum": [
+                      "OPEN_BOOK",
+                      "CLOSED_BOOK"
+                    ]
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/reviews/date": {
+      "post": {
+        "summary": "修改待复习日期",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "id",
+                  "due_date"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/goals/end": {
+      "post": {
+        "summary": "完成或终止目标，保存冻结快照",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "COMPLETED",
+                      "ABANDONED"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/goals/archive": {
+      "post": {
+        "summary": "归档或恢复已结束目标的可见性",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "archived"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/goals": {
+      "post": {
+        "summary": "创建目标",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "domain"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/conversations": {
+      "post": {
+        "summary": "创建目标内的规划对话",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "title"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/messages": {
+      "post": {
+        "summary": "保存用户消息并排队",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "task_kind": {
+                    "enum": [
+                      "chat",
+                      "material",
+                      "capabilities",
+                      "roadmap",
+                      "assessment",
+                      "review",
+                      "final"
+                    ]
+                  },
+                  "content_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "content",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      },
+      "get": {
+        "summary": "读取对话消息",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/resources": {
+      "post": {
+        "summary": "用户指定学习资料",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "role": {
+                    "enum": [
+                      "PRIMARY",
+                      "SUPPLEMENTARY",
+                      "REFERENCE"
+                    ]
+                  },
+                  "saved": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "title",
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/notes": {
+      "post": {
+        "summary": "新建或编辑用户笔记",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/notes/archive": {
+      "post": {
+        "summary": "归档或恢复笔记",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "archived"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/prompts": {
+      "post": {
+        "summary": "更新 Teacher 提示词并保留旧版本",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/proposals/decide": {
+      "post": {
+        "summary": "用户确认或拒绝路线",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "accept"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/goals/status": {
+      "post": {
+        "summary": "暂停或恢复目标",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "enum": [
+                      "PAUSED",
+                      "ACTIVE"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/sessions/assess": {
+      "post": {
+        "summary": "开始或恢复考察",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "enum": [
+                      "OPEN_BOOK",
+                      "CLOSED_BOOK"
+                    ]
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/jobs/cancel": {
+      "post": {
+        "summary": "取消待处理或处理中消息任务",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/state": {
+      "get": {
+        "summary": "读取 Web 工作台状态（包含用户自己可见的归档笔记）",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON 数据"
+          }
+        }
+      }
+    },
+    "/api/export": {
+      "get": {
+        "summary": "导出主要学习数据，不含密钥；不是完整数据库备份",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON 数据"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "本地服务健康检查",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "JSON 数据"
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "summary": "SSE 数据变更通知；客户端重新读取状态",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/event-stream"
+          }
+        }
+      }
+    },
+    "/api/assessment-rounds": {
+      "get": {
+        "summary": "读取逐题记录，正式考察结束前不显示反馈",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/api/agent/tool": {
+      "post": {
+        "summary": "供外部 Agent 使用的受限业务接口",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_capabilities"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "goal_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "$ref": "#/properties/goal_id"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "CORE",
+                                    "SUPPORTING"
+                                  ]
+                                },
+                                "requirements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "node": {
+                                        "$ref": "#/properties/goal_id"
+                                      },
+                                      "description": {
+                                        "$ref": "#/properties/goal_id"
+                                      }
+                                    },
+                                    "required": [
+                                      "node",
+                                      "description"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "kind",
+                                "requirements"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "goal_id",
+                          "request_id",
+                          "items"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_read_material"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "content_id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "content_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_analyze_material"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "content_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ANALYZED",
+                              "UNREADABLE"
+                            ]
+                          },
+                          "summary": {
+                            "$ref": "#/properties/content_id"
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/content_id"
+                          }
+                        },
+                        "required": [
+                          "content_id",
+                          "status",
+                          "summary",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_plan_learning"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "goal_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "summary": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "phases": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "$ref": "#/properties/goal_id"
+                                },
+                                "topics": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "key": {
+                                        "$ref": "#/properties/goal_id"
+                                      },
+                                      "title": {
+                                        "$ref": "#/properties/goal_id"
+                                      },
+                                      "requirement_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/properties/goal_id"
+                                        },
+                                        "minItems": 1
+                                      },
+                                      "resource_ids": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/properties/goal_id"
+                                        }
+                                      },
+                                      "dependencies": {
+                                        "$ref": "#/properties/phases/items/properties/topics/items/properties/resource_ids"
+                                      },
+                                      "sessions": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "title": {
+                                              "$ref": "#/properties/goal_id"
+                                            },
+                                            "objective": {
+                                              "$ref": "#/properties/goal_id"
+                                            }
+                                          },
+                                          "required": [
+                                            "title",
+                                            "objective"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "minItems": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "key",
+                                      "title",
+                                      "requirement_ids",
+                                      "resource_ids",
+                                      "dependencies",
+                                      "sessions"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "topics"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "goal_id",
+                          "title",
+                          "summary",
+                          "request_id",
+                          "phases"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_assessment_question"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "assessment_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "job_id": {
+                            "$ref": "#/properties/assessment_id"
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/assessment_id"
+                          },
+                          "question": {
+                            "$ref": "#/properties/assessment_id"
+                          },
+                          "requirement_ids": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/properties/assessment_id"
+                            },
+                            "minItems": 1
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/assessment_id"
+                          }
+                        },
+                        "required": [
+                          "assessment_id",
+                          "job_id",
+                          "lease_token",
+                          "question",
+                          "requirement_ids",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_assessment_feedback"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "round_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "feedback": {
+                            "$ref": "#/properties/round_id"
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/round_id"
+                          }
+                        },
+                        "required": [
+                          "round_id",
+                          "feedback",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_finish_assessment"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "assessment_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "summary": {
+                            "$ref": "#/properties/assessment_id"
+                          },
+                          "profile": {
+                            "$ref": "#/properties/assessment_id"
+                          },
+                          "change_summary": {
+                            "$ref": "#/properties/assessment_id"
+                          },
+                          "relations": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "requirement_id": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "relation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "SUPPORTS",
+                                    "CONTRADICTS",
+                                    "INCONCLUSIVE"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "requirement_id",
+                                "relation"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "gaps": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "requirement_id": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "description": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "reason": {
+                                  "$ref": "#/properties/assessment_id"
+                                }
+                              },
+                              "required": [
+                                "requirement_id",
+                                "description",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
+                          },
+                          "readiness": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "readiness_id": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "judgment": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "evidence_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/properties/assessment_id"
+                                  },
+                                  "default": []
+                                }
+                              },
+                              "required": [
+                                "readiness_id",
+                                "judgment"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
+                          },
+                          "completion_recommended": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/assessment_id"
+                          }
+                        },
+                        "required": [
+                          "assessment_id",
+                          "summary",
+                          "profile",
+                          "change_summary",
+                          "relations",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_schedule_review"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "goal_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "requirement_id": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "gap_id": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "due_date": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "reason": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/goal_id"
+                          }
+                        },
+                        "required": [
+                          "goal_id",
+                          "requirement_id",
+                          "due_date",
+                          "reason",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_list_conversations"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_get_context"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "conversation_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_claim_message"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "host": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "conversation_id": {
+                            "type": "string"
+                          },
+                          "wait_seconds": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 25
+                          }
+                        },
+                        "required": [
+                          "host"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_renew_lease"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "lease_token": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_reply"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "lease_token": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 20000
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "content",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_roadmap"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "goal_id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string"
+                                },
+                                "objective": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "objective"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1,
+                            "maxItems": 20
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "goal_id",
+                          "title",
+                          "summary",
+                          "items",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_record_assessment"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "source_message_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "minItems": 1
+                          },
+                          "profile": {
+                            "type": "string"
+                          },
+                          "change_summary": {
+                            "type": "string"
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "conversation_id",
+                          "summary",
+                          "source_message_ids",
+                          "profile",
+                          "change_summary",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "summary": "标准 Streamable HTTP MCP；同一组 Agent 工具",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP JSON-RPC response"
+          },
+          "202": {
+            "description": "Notification accepted"
+          }
+        }
+      }
+    }
+  }
+}

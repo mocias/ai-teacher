@@ -1,0 +1,24 @@
+{
+  "name": "ai-teacher",
+  "version": "0.4.0",
+  "description": "Connect a local learning workspace to your AI host through MCP.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AI Teacher",
+    "shortDescription": "在本地 Web 中学习，与宿主中的 Teacher 对话。",
+    "longDescription": "领取本地学习消息、回传回复、提出学习路线并保存有依据的考察结论。",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "处理 AI Teacher Web 中的待回复消息，并将回复写回 Web。"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

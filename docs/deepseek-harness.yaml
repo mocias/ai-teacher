@@ -1,0 +1,11 @@
+# TEMPLATE ONLY. Run node scripts/configure-plugin.mjs from the project.
+# Copy the generated .local/deepseek-harness.yaml entry into your host config.
+# Requires @deepseek-ai/dsh-mcp-client; do not overwrite your existing config.
+- id: mcp-ai-teacher
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: ai-teacher
+    transport: stdio
+    command: '{{NODE_EXECUTABLE}}'
+    args: ['{{MCP_ENTRY}}']
+    toolCallTimeoutMs: 60000

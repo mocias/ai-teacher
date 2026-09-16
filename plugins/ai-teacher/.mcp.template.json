@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ai-teacher": {
+      "command": "{{NODE_EXECUTABLE}}",
+      "args": ["{{MCP_ENTRY}}"]
+    }
+  }
+}
