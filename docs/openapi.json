@@ -24,6 +24,303 @@
     }
   },
   "paths": {
+    "/api/discussions": {
+      "post": {
+        "summary": "开始独立的目标讨论",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/draft": {
+      "post": {
+        "summary": "自动保存手动修改的草案字段",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "draft": {
+                    "type": "object",
+                    "properties": {
+                      "direction": {
+                        "type": "string",
+                        "maxLength": 150
+                      },
+                      "background": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "level": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "exclusions": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "revision",
+                  "draft"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/input": {
+      "post": {
+        "summary": "保存未发送文字",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 20000
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/suggestion": {
+      "post": {
+        "summary": "接受或拒绝 AI 对手动字段的修改建议",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "revision",
+                  "accept"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/confirm": {
+      "post": {
+        "summary": "用户确认草案并创建目标（重复确认返回同一目标）",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/resource-file": {
+      "get": {
+        "summary": "下载已保存的本地原文件",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "原始文件，以附件下载"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "404": {
+            "description": "文件不存在"
+          }
+        }
+      }
+    },
     "/api/host/settings": {
       "post": {
         "summary": "配置 Codex 自动唤醒",
@@ -1240,7 +1537,7 @@
     },
     "/api/resources": {
       "post": {
-        "summary": "用户指定学习资料",
+        "summary": "保存网页资料或本地文件副本（最多 20 MiB）",
         "security": [
           {
             "UserSession": []
@@ -1272,12 +1569,17 @@
                   },
                   "saved": {
                     "type": "boolean"
+                  },
+                  "file": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": "string", "maxLength": 255},
+                      "base64": {"type": "string", "description": "原文件的 base64 内容"}
+                    },
+                    "required": ["name", "base64"]
                   }
                 },
-                "required": [
-                  "title",
-                  "role"
-                ]
+                "description": "title 可从文件名生成；goal_id 可留空；role 默认 REFERENCE。TXT/Markdown 符合长度和编码要求时同时保存正文。"
               }
             }
           }

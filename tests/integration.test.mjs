@@ -21,11 +21,11 @@ test('Web → real MCP stdio/HTTP client → Web + service restart persistence',
  const created=await post('goals',{title:'集成测试',domain:'测试'});const sent=await post('messages',{conversation_id:created.conversation.id,content:'请帮我确定学习范围',request_id:'send-once'});
  const client=new Client({name:'integration',version:'1.0'});
  await client.connect(new StdioClientTransport({command:process.execPath,args:[resolve('plugins/ai-teacher/scripts/mcp.mjs')],env:{...process.env,TEACHER_URL:url,TEACHER_TOKEN:app.token},stderr:'pipe'}));t.after(()=>client.close());
- const catalog=await client.listTools();assert.equal(catalog.tools.length,15);
+ const catalog=await client.listTools();assert.ok(catalog.tools.some(t=>t.name==='teacher_propose_goal_draft'));assert.ok(catalog.tools.some(t=>t.name==='teacher_reply'));
  const claim=JSON.parse((await client.callTool({name:'teacher_claim_message',arguments:{host:'Integration test'}})).content[0].text);assert.equal(claim.job.message_id,sent.message_id);
  const r=await client.callTool({name:'teacher_reply',arguments:{job_id:claim.job.id,lease_token:claim.job.lease_token,content:'你想把这个知识用在什么场景？',request_id:'reply-once'}});assert.notEqual(r.isError,true);
  const messages=await(await fetch(url+'/api/messages?conversation_id='+created.conversation.id,{headers:{Cookie:cookie}})).json();assert.equal(messages.length,2);assert.equal(messages[1].role,'assistant');
- const httpClient=new Client({name:'http-test',version:'1.0'});await httpClient.connect(new StreamableHTTPClientTransport(new URL(url+'/mcp'),{requestInit:{headers:{Authorization:'Bearer '+app.token}}}));assert.equal((await httpClient.listTools()).tools.length,15);await httpClient.close();
+ const httpClient=new Client({name:'http-test',version:'1.0'});await httpClient.connect(new StreamableHTTPClientTransport(new URL(url+'/mcp'),{requestInit:{headers:{Authorization:'Bearer '+app.token}}}));assert.equal((await httpClient.listTools()).tools.length,catalog.tools.length);await httpClient.close();
  await client.close();app.close();await once(app.server,'close');
  const restarted=startServer({port:0,dataDir:dir});await once(restarted.server,'listening');assert.equal(restarted.store.messages(created.conversation.id).length,2);restarted.close();await once(restarted.server,'close');
 });

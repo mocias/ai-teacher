@@ -43,6 +43,8 @@ next-env.d.ts
 /.agents/
 /.codex/
 /outputs/
+/.playwright-cli/
+/output/playwright/
 /work/
 # Local learning data and credentials
 data/

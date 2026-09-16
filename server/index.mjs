@@ -21,7 +21,7 @@ export function startServer({executorOptions={},hostOptions={},port=Number(proce
  const hostDriver=codexHost(store,{...hostOptions,dataDir,baseUrl:()=>`http://127.0.0.1:${server.address().port}`,notify});
  const json=(res,code,body)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
  const authorized=req=>{const got=Buffer.from((req.headers.authorization||'').replace(/^Bearer /,'')),expected=Buffer.from(token);return got.length===expected.length&&timingSafeEqual(got,expected);};
- async function body(req){let chunks=[],n=0;for await(const chunk of req){n+=chunk.length;if(n>700000)throw new AppError('请求过大',413);chunks.push(chunk);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw new AppError('JSON 格式无效');}}
+ async function body(req,limit=700000){let chunks=[],n=0;for await(const chunk of req){n+=chunk.length;if(n>limit)throw new AppError('请求过大',413);chunks.push(chunk);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw new AppError('JSON 格式无效');}}
  const server=http.createServer(async(req,res)=>{
   try{
    const host=req.headers.host||'';if(!/^(127\.0\.0\.1|localhost):\d+$/.test(host))throw new AppError('只允许本机访问',403);
@@ -49,7 +49,8 @@ export function startServer({executorOptions={},hostOptions={},port=Number(proce
    }
    if(path.startsWith('/api/')&&path!=='/api/health'&&path!=='/api/openapi.json'&&!(req.headers.cookie||'').split(';').some(x=>x.trim()==='teacher_session='+userSession))throw new AppError('请刷新页面以连接本地工作台',401);
    if(path==='/api/events'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write(': connected\n\n');listeners.add(res);req.on('close',()=>listeners.delete(res));return;}
-   if(req.method==='GET'&&path==='/api/state'){store.recover();store.models.sync();json(res,200,{...store.overview(),host:{last_seen:lastHostSeen},local:true});return;}
+   if(req.method==='GET'&&path==='/api/state'){store.recover();store.models.sync();json(res,200,{...store.overview(),resource_files:store.db.prepare('SELECT resource_id,name,length(content) AS size FROM resource_files').all(),host:{last_seen:lastHostSeen},local:true});return;}
+   if(req.method==='GET'&&path==='/api/resource-file'){const file=store.db.prepare('SELECT name,content FROM resource_files WHERE resource_id=?').get(url.searchParams.get('id'));if(!file)throw new AppError('文件不存在',404);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(file.name).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16)));res.setHeader('Cache-Control','no-store');res.end(Buffer.from(file.content));return;}
    if(req.method==='GET'&&path==='/api/health'){json(res,200,{ok:true,service:'ai-teacher',version:'0.4.0',data_id:dataId});return;}
    if(req.method==='GET'&&path==='/api/messages'){json(res,200,store.messages(url.searchParams.get('conversation_id')));return;}
    if(req.method==='GET'&&path==='/api/assessment-rounds'){json(res,200,store.learning.rounds({id:url.searchParams.get('id')}));return;}
@@ -60,8 +61,13 @@ export function startServer({executorOptions={},hostOptions={},port=Number(proce
     if(!req.headers['content-type']?.startsWith('application/json'))throw new AppError('需要 application/json',415);
     // Agent credentials never authorize user-only confirmation or note-edit routes.
     if(req.headers.authorization)throw new AppError('Agent 不可调用用户维护接口',403);
-    const a=await body(req);let result;
+    const a=await body(req,path==='/api/resources'?28000000:700000);let result;
     switch(path){
+     case '/api/discussions':result=store.discovery.create(a);break;
+     case '/api/discussions/draft':result=store.discovery.save(a);break;
+     case '/api/discussions/suggestion':result=store.discovery.decide(a);break;
+     case '/api/discussions/input':result=store.discovery.saveInput(a);break;
+     case '/api/discussions/confirm':result=store.discovery.confirm(a);break;
      case '/api/goals':result=store.createGoal(a);break;
      case '/api/conversations':result=store.newConversation(a.goal_id,a.title);break;
      case '/api/messages':store.models.validateTask(a.conversation_id,a.task_kind,a.content_id);result=store.send(a.conversation_id,a.content,a.request_id);{const j=store.db.prepare('SELECT id FROM jobs WHERE message_id=?').get(result.message_id);if(j)store.models.tag(j.id,a.task_kind,a.content_id);}break;
@@ -93,7 +99,7 @@ export function startServer({executorOptions={},hostOptions={},port=Number(proce
      default:throw new AppError('接口不存在',404);
     }notify();json(res,200,result);return;
    }
-   const files={'/':'index.html','/app.js':'app.js','/learning.js':'learning.js','/models.js':'models.js','/host.js':'host.js','/style.css':'style.css'};
+   const files={'/':'index.html','/app.js':'app.js','/resources.js':'resources.js','/discovery.js':'discovery.js','/learning.js':'learning.js','/models.js':'models.js','/host.js':'host.js','/style.css':'style.css'};
    if(req.method!=='GET'||!files[path])throw new AppError('页面不存在',404);
    if(path==='/')res.setHeader('Set-Cookie',`teacher_session=${userSession}; HttpOnly; SameSite=Strict; Path=/`);
    res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(files[path])]);res.end(readFileSync(new URL('../public/'+files[path],import.meta.url)));
