@@ -24,6 +24,109 @@
     }
   },
   "paths": {
+    "/api/calendar": {
+      "post": {
+        "summary": "添加或编辑学习日程",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "time": {
+                    "type": "string"
+                  },
+                  "session_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "date"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
+    "/api/calendar/done": {
+      "post": {
+        "summary": "标记日程待办完成（不更新学习证据）",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "done": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "done"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
     "/api/discussions": {
       "post": {
         "summary": "开始独立的目标讨论",

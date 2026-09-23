@@ -11,7 +11,7 @@ const app=startServer({port:4329,dataDir,executorOptions:{fetcher:async(_url,opt
  let message;
  if(turns<2)message={content:'你希望先建立整体认识，还是达到能独立修改推理引擎的实践层级？'};
  else if(!body.messages.some(m=>m.role==='tool'))message={tool_calls:[{id:'draft-fixture',type:'function',function:{name:'teacher_propose_goal_draft',arguments:JSON.stringify({revision:context.discovery.discussion.revision,draft:{direction:'单卡大模型推理',background:'已掌握 Python',level:'能够独立实践',outcome:'运行并修改简化推理引擎',exclusions:'多机部署'},summary:'希望从 Python 基础出发，聚焦单卡推理实践。'})}}]};
- else message={content:'我已把讨论整理成右侧草案。你可以直接修改，确认后再创建目标。'};
+ else message={content:'我已把讨论整理成目标草案。你可以点击“查看目标草案”进行修改，确认后再创建目标。'};
  return new Response(JSON.stringify({choices:[{finish_reason:message.tool_calls?'tool_calls':'stop',message}]}));
  }}});
 await once(app.server,'listening');

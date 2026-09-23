@@ -1,4 +1,5 @@
 import {hostConfig} from './host-config.mjs';
+import {calendarService} from './calendar.mjs';
 import {migrateDiscovery,discoveryService,discoveryPrompt} from './discovery.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -22,7 +23,7 @@ export function createStore(file){
  function chat(c){const row=one('SELECT * FROM conversations WHERE id=?',c);if(!row)throw new AppError('对话不存在',404);return row;}
  function receipt(key,op,fn){text(key,'request_id',100);return tx(()=>{const old=one('SELECT * FROM receipts WHERE request_id=?',key);if(old){if(old.operation!==op)throw new AppError('request_id 已用于其他操作',409);return JSON.parse(old.result);}const result=fn();run('INSERT INTO receipts VALUES(?,?,?)',key,op,JSON.stringify(result));return result;});}
  if(!one('SELECT id FROM prompts LIMIT 1'))run('INSERT INTO prompts VALUES(?,?,?,?,?)','teacher','Teacher 核心提示词',teacherPrompt,1,now());
- function overview(){return {discussions:discovery.state(),hostAutomation:hostSettings.state(),models:models.state(),learning:learning.state(),goals:all('SELECT * FROM goals ORDER BY created_at DESC'),conversations:all('SELECT * FROM conversations ORDER BY created_at DESC'),resources:all('SELECT * FROM resources ORDER BY created_at DESC'),notes:all('SELECT * FROM notes ORDER BY updated_at DESC'),prompts:all('SELECT * FROM prompts'),proposals:all('SELECT * FROM proposals ORDER BY created_at DESC').map(p=>({...p,items:JSON.parse(p.items)})),sessions:all('SELECT * FROM sessions ORDER BY position'),evidence:all('SELECT * FROM evidence ORDER BY created_at DESC'),profiles:all('SELECT * FROM profiles'),jobs:all('SELECT id,message_id,conversation_id,status,host,lease_until FROM jobs ORDER BY created_at'),version:'0.4.0'};}
+ function overview(){return {calendar:calendar.state(),discussions:discovery.state(),hostAutomation:hostSettings.state(),models:models.state(),learning:learning.state(),goals:all('SELECT * FROM goals ORDER BY created_at DESC'),conversations:all('SELECT * FROM conversations ORDER BY created_at DESC'),resources:all('SELECT * FROM resources ORDER BY created_at DESC'),notes:all('SELECT * FROM notes ORDER BY updated_at DESC'),prompts:all('SELECT * FROM prompts'),proposals:all('SELECT * FROM proposals ORDER BY created_at DESC').map(p=>({...p,items:JSON.parse(p.items)})),sessions:all('SELECT * FROM sessions ORDER BY position'),evidence:all('SELECT * FROM evidence ORDER BY created_at DESC'),profiles:all('SELECT * FROM profiles'),jobs:all('SELECT id,message_id,conversation_id,status,host,lease_until FROM jobs ORDER BY created_at'),version:'0.4.0'};}
  function newConversation(g,title,kind='PLANNING'){if(['COMPLETED','ABANDONED'].includes(goal(g).status))throw new AppError('已结束目标仅可通过复习入口创建考察',409);const c=id();run('INSERT INTO conversations VALUES(?,?,?,?,?)',c,g,text(title,'对话标题',150),kind,now());return chat(c);}
  function createGoal(input){return tx(()=>{const g=id();run('INSERT INTO goals VALUES(?,?,?,?,?,?)',g,text(input.title,'目标名称',150),text(input.domain,'领域',100),String(input.scope||'').slice(0,5000),'INITIALIZING',now());return {goal:goal(g),conversation:newConversation(g,'目标与学习计划')};});}
  function messages(c){chat(c);return all('SELECT * FROM messages WHERE conversation_id=? ORDER BY rowid',c);}
@@ -54,5 +55,6 @@ if(input.file){const name=text(input.file.name,'文件名',255);if(/[\\/\x00-\x1
  const models=modelConfig(db,file);
  const hostSettings=hostConfig(db,file);
  const discovery=discoveryService(db,{send,newConversation,receipt});
- return {discovery,hostConfig:hostSettings,models,learning,db,overview,createGoal,newConversation,messages,send,claim,renew,reply,context,resource,saveNote,archiveNote,savePrompt,propose,decide,setGoalStatus,startSession,assessment,cancel,recover};
+ const calendar=calendarService(db);
+ return {calendar,discovery,hostConfig:hostSettings,models,learning,db,overview,createGoal,newConversation,messages,send,claim,renew,reply,context,resource,saveNote,archiveNote,savePrompt,propose,decide,setGoalStatus,startSession,assessment,cancel,recover};
 }
