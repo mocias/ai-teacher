@@ -2,13 +2,16 @@ import {modelsView,modelAction,executionBanner} from './models.js';
 import {addResource} from './resources.js';
 import {calendarView,calendarAction} from './calendar.js';
 import {discoveryView,discussionId,discussionMessages,discoveryAction,discoveryInput} from './discovery.js';
-import {learningView,resourceControls,assessmentBanner,learningAction} from './learning.js';
+import {learningView,reviewView,resourceControls,assessmentBanner,learningAction} from './learning.js';
 const $=s=>document.querySelector(s);
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={INITIALIZING:'准备中',READY_FOR_CONFIRMATION:'待确认路线',ACTIVE:'学习中',PAUSED:'已暂停',PLANNED:'待学习',ASSESSING:'考察中',COMPLETED:'已完成',QUEUED:'等待处理',RUNNING:'处理中',CANCELLED:'已取消',PENDING:'待你确认',ACCEPTED:'已采用',REJECTED:'未采用',SUPERSEDED:'已有新方案',REMOVED_FROM_PLAN:'已移出计划'};
 const badge=s=>`<span class="badge ${escape(s)}">${labels[s]||escape(s)}</span>`;
 const date=s=>new Date(s).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
-const navs=[['home','◫','学习概览'],['chat','◌','Teacher 对话'],['plan','≡','学习路线'],['learning','◎','评估与复习'],['resources','▤','资料库'],['notes','▧','我的笔记'],['profile','◇','学习画像'],['models','⇄','模型与分工'],['settings','⚙','提示词与连接']];
+const navs=[['home','◫','学习概览'],['chat','◌','Teacher 对话'],['plan','≡','学习路线'],['learning','◎','评估'],['review','↻','复习'],['resources','▤','资料库'],['notes','▧','我的笔记'],['profile','◇','学习画像'],['models','⇄','模型与分工'],['settings','⚙','提示词与连接']];
+const navGroups=[{title:'学习管理',icon:'≡',views:['plan','learning','review']},{title:'资料与笔记',icon:'▤',views:['resources','notes']},{title:'设置',icon:'⚙',views:['profile','models','settings']}];
+const navButton=([v,i,t])=>`<button data-view="${v}"><span class="navicon">${i}</span>${t}</button>`;
+function navigation(){return navs.filter(n=>['home','chat'].includes(n[0])).map(navButton).join('')+navGroups.map((g,i)=>`<details class="nav-group" data-nav-group="${i}" ${i===0?'open':''}><summary><span class="navicon">${g.icon}</span>${g.title}</summary><div class="nav-children">${g.views.map(v=>navButton(navs.find(n=>n[0]===v))).join('')}</div></details>`).join('');}
 let state=null,view='home',goalId=null,chatId=null,chatMessages=[],filter='',includeArchived=false,promptDirty=false,promptDraft='',busy=false;
 const drafts=new Map(),requestIds=new Map(),taskKinds=new Map();
 async function api(path,data){const r=await fetch('/api/'+path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const value=await r.json();if(!r.ok)throw new Error(value.error||'请求失败');return value;}
@@ -19,17 +22,18 @@ const head=(title,description,action='')=>`<div class="heading"><div><div class=
 const empty=(title,description,button='')=>`<div class="empty"><div class="symbol">◈</div><h2>${title}</h2><p>${description}</p>${button}</div>`;
 const newGoalButton='<button class="primary" data-action="new-goal">＋ 新建学习目标</button>';
 function shell(){
- $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brandmark">A</span><div>AI Teacher<small>PERSONAL WORKSPACE</small></div></div><div class="navlabel">我的学习空间</div><nav class="nav" aria-label="主导航">${navs.map(([v,i,t])=>`<button data-view="${v}" class="${v===view?'active':''}"><span class="navicon">${i}</span>${t}</button>`).join('')}</nav><div class="sidebottom"><span class="localtag">本机学习空间</span><br>你的资料与记录保存在本机<br><span>V0.4 · Codex 自动唤醒</span></div></aside><div class="workspace"><header class="topbar"><div class="crumb">个人学习 / <strong id="crumb"></strong></div><button class="hoststatus" data-view="settings" id="hoststatus"></button></header><main class="main" id="main"></main></div></div>`;
+ $('#app').innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="brandmark">A</span><div>AI Teacher<small>PERSONAL WORKSPACE</small></div></div><div class="navlabel">我的学习空间</div><nav class="nav" aria-label="主导航">${navigation()}</nav><div class="sidebottom"><span class="localtag">本机学习空间</span><br>你的资料与记录保存在本机<br><span>V0.4 · Codex 自动唤醒</span></div></aside><div class="workspace"><header class="topbar"><div class="crumb">个人学习 / <strong id="crumb"></strong></div><button class="hoststatus" data-view="settings" id="hoststatus"></button></header><main class="main" id="main"></main></div></div>`;
  render();
 }
 function render(){
  const main=$('#main');if(!main)return;
  if(view==='home'&&document.activeElement?.matches('[data-draft-field],#discovery-input'))return;
  const activeInput=document.activeElement;const focusId=activeInput?.id;const selection=activeInput?.selectionStart;const scroll=$('.messages')?.scrollTop;const nearBottom=$('.messages')?$('.messages').scrollHeight-$('.messages').scrollTop-$('.messages').clientHeight<80:true;
- $('#crumb').textContent=navs.find(n=>n[0]===view)[2];
+ const group=navGroups.find(g=>g.views.includes(view));$('#crumb').textContent=(group?group.title+' / ':'')+navs.find(n=>n[0]===view)[2];
+ document.querySelectorAll('[data-nav-group]').forEach(el=>{const active=navGroups[Number(el.dataset.navGroup)].views.includes(view);if(active&&!el.classList.contains('contains-active'))el.open=true;el.classList.toggle('contains-active',active);});
  $('#hoststatus').textContent=state.hostAutomation?.settings.enabled?'Codex 自动唤醒已启用':state.models?.enabled?'API 执行器已启用':state.host.last_seen?'宿主最近访问 · '+date(state.host.last_seen):'尚未连接宿主';
- document.querySelectorAll('[data-view]').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
- main.innerHTML=({home:home,chat:chatView,plan:plan,resources:resources,notes:notes,profile:profile,settings:settings,models:()=>head('模型与分工','为不同的学习任务配置不同模型。')+modelsView(state),learning:()=>head('评估与复习','用材料与证据形成路线，持续验证，完成目标。')+(state.goals.length?goalSelect():'')+learningView(state,goalId)})[view]();
+ document.querySelectorAll('[data-view]').forEach(n=>{n.classList.toggle('active',n.dataset.view===view);if(n.dataset.view===view)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current');});
+ main.innerHTML=({home:home,chat:chatView,plan:plan,resources:resources,notes:notes,profile:profile,settings:settings,models:()=>head('模型与分工','为不同的学习任务配置不同模型。')+modelsView(state),review:()=>head('复习','按日期安排复习，回看复习记录。')+(state.goals.length?goalSelect():'')+reviewView(state,goalId),learning:()=>head('评估','确认能力要求，通过考察判断掌握程度。')+(state.goals.length?goalSelect():'')+learningView(state,goalId)})[view]();
  main.classList.toggle('home-main',view==='home');if(view==='home'){const messages=main.querySelector('.discovery-messages');if(messages)messages.scrollTop=messages.scrollHeight;}
  if(view==='chat'){const origin=state.discussions?.find(d=>d.goal_id===goalId);if(origin)main.querySelector('.chattitle')?.insertAdjacentHTML('afterend',`<div class="assessmentbar"><span>已保留目标草案与讨论摘要</span><button data-action="discovery-history" data-id="${origin.conversation_id}">回看目标探索记录</button></div>`);}
  if(view==='chat'&&!state.learning?.assessments.some(x=>x.conversation_id===chatId)){document.querySelector('#composer')?.insertAdjacentHTML('afterbegin',`<label for="task-kind">本条消息用途</label><select id="task-kind">${[['chat','普通对话'],['capabilities','能力要求'],['roadmap','学习路线']].map(([v,t])=>`<option value="${v}" ${v===(taskKinds.get(chatId)||'chat')?'selected':''}>${t}</option>`).join('')}</select>`);}
@@ -55,7 +59,7 @@ async function action(name,node){const nid=node.dataset.id;
  const env={state,goalId,api,dialog,toast,refresh,openChat:async c=>{chatId=c;goalId=state.conversations.find(x=>x.id===c)?.goal_id||goalId;view='chat';await refresh();}};
  if(name.startsWith('model-'))return modelAction(name.slice(6),node,env);
  if(name.startsWith('calendar-'))return calendarAction(name.slice(9),node,env);
- if(name==='open-learning'){goalId=nid;view='learning';await refresh();return;}
+ if(name==='open-learning'){goalId=nid;view='review';await refresh();return;}
  if(name.startsWith('discovery-'))return discoveryAction(name.slice(10),node,discoveryEnv());
  if(name.startsWith('v2-'))return learningAction(name.slice(3),node,name==='v2-analyze'?{...env,goalId:state.resources.find(r=>r.id===nid)?.goal_id}:env);
  if(name==='assess'&&state.learning?.session_details.some(x=>x.session_id===nid))return learningAction('session',node,env);
