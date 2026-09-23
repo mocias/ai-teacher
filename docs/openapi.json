@@ -55,6 +55,12 @@
                   },
                   "session_id": {
                     "type": "string"
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440,
+                    "description": "预计时长，单位分钟，默认30"
                   }
                 },
                 "required": [
@@ -1676,10 +1682,19 @@
                   "file": {
                     "type": "object",
                     "properties": {
-                      "name": {"type": "string", "maxLength": 255},
-                      "base64": {"type": "string", "description": "原文件的 base64 内容"}
+                      "name": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "base64": {
+                        "type": "string",
+                        "description": "原文件的 base64 内容"
+                      }
                     },
-                    "required": ["name", "base64"]
+                    "required": [
+                      "name",
+                      "base64"
+                    ]
                   }
                 },
                 "description": "title 可从文件名生成；goal_id 可留空；role 默认 REFERENCE。TXT/Markdown 符合长度和编码要求时同时保存正文。"
@@ -2972,6 +2987,154 @@
           },
           "202": {
             "description": "Notification accepted"
+          }
+        }
+      }
+    },
+    "/api/calendar/progress": {
+      "post": {
+        "summary": "保存学习进度和记录，不作为能力证据",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "id",
+                  "progress",
+                  "notes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
+    "/api/calendar/cancel": {
+      "post": {
+        "summary": "取消日程，保留历史记录",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
+    "/api/calendar/move": {
+      "post": {
+        "summary": "调整同一天的日程顺序，不修改路线依赖",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "up",
+                      "down"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "direction"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
           }
         }
       }

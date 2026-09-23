@@ -65,6 +65,9 @@ export function startServer({executorOptions={},hostOptions={},port=Number(proce
     switch(path){
      case '/api/calendar':result=store.calendar.save(a);break;
      case '/api/calendar/done':result=store.calendar.done(a);break;
+     case '/api/calendar/progress':result=store.calendar.progress(a);break;
+     case '/api/calendar/cancel':result=store.calendar.cancel(a);break;
+     case '/api/calendar/move':result=store.calendar.move(a);break;
      case '/api/discussions':result=store.discovery.create(a);break;
      case '/api/discussions/draft':result=store.discovery.save(a);break;
      case '/api/discussions/suggestion':result=store.discovery.decide(a);break;
@@ -101,7 +104,7 @@ export function startServer({executorOptions={},hostOptions={},port=Number(proce
      default:throw new AppError('接口不存在',404);
     }notify();json(res,200,result);return;
    }
-   const files={'/':'index.html','/app.js':'app.js','/resources.js':'resources.js','/discovery.js':'discovery.js','/calendar.js':'calendar.js','/learning.js':'learning.js','/models.js':'models.js','/host.js':'host.js','/style.css':'style.css'};
+   const files={'/':'index.html','/app.js':'app.js','/resources.js':'resources.js','/discovery.js':'discovery.js','/calendar.js':'calendar.js','/tasks.js':'tasks.js','/learning.js':'learning.js','/models.js':'models.js','/host.js':'host.js','/style.css':'style.css'};
    if(req.method!=='GET'||!files[path])throw new AppError('页面不存在',404);
    if(path==='/')res.setHeader('Set-Cookie',`teacher_session=${userSession}; HttpOnly; SameSite=Strict; Path=/`);
    res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(files[path])]);res.end(readFileSync(new URL('../public/'+files[path],import.meta.url)));
