@@ -26,7 +26,7 @@ async function start(){
   let response;try{response=await fetch('http://127.0.0.1:4317/api/health',{signal:AbortSignal.timeout(1000)});}catch{}
   if(response){let health;try{health=await response.json();}catch{}
    const identity=createHash('sha256').update(process.platform==='win32'?resolve(dataDir).toLowerCase():resolve(dataDir)).digest('hex');
-   if(health?.service!=='ai-teacher'||health.data_id!==identity)throw Error('端口 4317 已有其他服务或旧版工作台。请先关闭该服务，再打开桌面应用。');
+   if(health?.service!=='ai-teacher'||health.data_id!==identity||!['harness-routing','learning-loop','review-followups','remediation-plans'].every(f=>health.features?.includes(f)))throw Error('端口 4317 已有其他服务或旧版工作台。请先关闭该服务，再打开桌面应用。');
    base='http://127.0.0.1:4317';
   }
  }
@@ -38,7 +38,8 @@ async function start(){
   await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('本地服务启动超时')),20000);child.once('error',e=>{clearTimeout(timer);reject(e);});child.once('exit',code=>{clearTimeout(timer);reject(new Error(`本地服务退出 (${code})`));});child.on('message',m=>{if(m.type==='ready'){base=m.url;clearTimeout(timer);resolve();}});});
   child.on('exit',()=>{if(!quitting){dialog.showErrorBox('服务已停止','请退出并重新打开 AI Teacher。学习数据保存在本机。');app.quit();}});
  }
- window=new BrowserWindow({width:config.width||1380,height:config.height||900,minWidth:960,minHeight:640,title:'AI Teacher · 学习工作台',backgroundColor:'#f7f8fa',show:!smoke,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ window=new BrowserWindow({width:config.width||1380,height:config.height||900,minWidth:960,minHeight:640,title:'AI Teacher · 学习工作台',backgroundColor:'#f7f8fa',show:!smoke,webPreferences:{backgroundThrottling:false,preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ require('./reader.cjs').installReader({base,main:window});
  window.webContents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//.test(url))shell.openExternal(url);return {action:'deny'};});
  window.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==base){event.preventDefault();if(/^https?:\/\//.test(url))shell.openExternal(url);}});
  window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
@@ -52,6 +53,8 @@ async function start(){
  if(smoke){
   const result=await window.webContents.executeJavaScript(`new Promise((resolve,reject)=>{const start=Date.now();const tick=setInterval(()=>{if(document.querySelector('#app button')){clearInterval(tick);resolve();}else if(Date.now()-start>10000){clearInterval(tick);reject(Error('UI did not render'));}},100)}).then(()=>fetch('/api/state')).then(r=>{if(!r.ok)throw Error('state '+r.status);return r.json()}).then(s=>({title:document.title,hasApp:!!document.querySelector('#app button'),goals:s.goals?.length,body:document.body.innerText.slice(0,150)}))`);
   if(process.env.TEACHER_SMOKE_OUTPUT){const output=process.env.TEACHER_SMOKE_OUTPUT;mkdirSync(output,{recursive:true});writeFileSync(join(output,'desktop.png'),(await window.webContents.capturePage()).toPNG());writeFileSync(join(output,'result.json'),JSON.stringify({...result,base,servicePid:child?.pid,packaged:app.isPackaged,menus:Menu.getApplicationMenu().items.map(i=>i.label)},null,2));}
+  if(process.argv.includes('--reader-smoke'))await require('./reader-smoke.cjs').run(window,base);
+  if(process.argv.includes('--learning-smoke'))await require('./learning-loop-smoke.cjs').run(window,base);
   console.log('DESKTOP_SMOKE_OK '+JSON.stringify(result));app.quit();
  }
 }

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AI Teacher Local API",
-    "version": "0.4.0",
+    "version": "0.7.0",
     "description": "仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。"
   },
   "servers": [
@@ -3135,6 +3135,1173 @@
           },
           "403": {
             "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
+    "/api/study/open": {
+      "post": {
+        "summary": "Open a resource for goal-independent reading",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/progress": {
+      "post": {
+        "summary": "Record active reading location without mastery evidence",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/annotate": {
+      "post": {
+        "summary": "Save a highlight, underline or page note",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/link": {
+      "post": {
+        "summary": "Link a shared resource to a goal",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/ask": {
+      "post": {
+        "summary": "Queue a reading question with a frozen content snapshot",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/onboarding": {
+      "post": {
+        "summary": "Start, resume or skip first-use introduction",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/confirm": {
+      "post": {
+        "summary": "User-only version-checked profile confirmation",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/skip": {
+      "post": {
+        "summary": "Skip a merged change follow-up",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/study/edit": {
+      "post": {
+        "summary": "Edit a learning object; capability edits create a new version",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "409": {
+            "description": "State conflict or invalid operation"
+          }
+        }
+      }
+    },
+    "/api/reader-file": {
+      "get": {
+        "summary": "Read original PDF/Markdown or locally converted PPT/PPTX",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF or UTF-8 Markdown body"
+          }
+        }
+      }
+    },
+    "/api/agents/configure": {
+      "post": {
+        "summary": "配置主 Agent 或模块分工",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "master",
+                      "chat",
+                      "material",
+                      "capabilities",
+                      "roadmap",
+                      "assessment",
+                      "review",
+                      "final",
+                      "reading",
+                      "onboarding",
+                      "change_review"
+                    ]
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "API",
+                      "MCP",
+                      "UNCONFIGURED"
+                    ]
+                  },
+                  "profile_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "harness": {
+                    "type": "string",
+                    "enum": [
+                      "MANUAL",
+                      "CODEX",
+                      "CLAUDE"
+                    ],
+                    "description": "仅 MCP 模式使用；CODEX 或 CLAUDE 由本机服务自动启动，MANUAL 由外部 Agent 主动领取"
+                  },
+                  "executable": {
+                    "type": "string",
+                    "description": "可选的本机宿主可执行文件绝对路径"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "可选的宿主模型标识"
+                  }
+                },
+                "required": [
+                  "role",
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/agents/token": {
+      "post": {
+        "summary": "生成或轮换独立 MCP 凭据；返回一次性原文和 stdio 配置",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "master",
+                      "chat",
+                      "material",
+                      "capabilities",
+                      "roadmap",
+                      "assessment",
+                      "review",
+                      "final",
+                      "reading",
+                      "onboarding",
+                      "change_review"
+                    ]
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/agents/decide": {
+      "post": {
+        "summary": "用户确认或拒绝主 Agent 分工提案",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "keys": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "accept",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/agents/conversation": {
+      "post": {
+        "summary": "打开主 Agent 配置助手会话",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/agents/retry": {
+      "post": {
+        "summary": "等待任务按其所属功能的当前配置重试",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "job_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "job_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/agents/catalog": {
+      "post": {
+        "summary": "独立 stdio 适配器获取角色工具目录",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "master",
+                      "chat",
+                      "material",
+                      "capabilities",
+                      "roadmap",
+                      "assessment",
+                      "review",
+                      "final",
+                      "reading",
+                      "onboarding",
+                      "change_review"
+                    ]
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/agents/tool": {
+      "post": {
+        "summary": "使用模块独立凭据调用任务范围内的工具",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "master",
+                      "chat",
+                      "material",
+                      "capabilities",
+                      "roadmap",
+                      "assessment",
+                      "review",
+                      "final",
+                      "reading",
+                      "onboarding",
+                      "change_review"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "role",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "401": {
+            "description": "身份验证失败"
+          },
+          "403": {
+            "description": "工具或任务权限不足"
+          },
+          "409": {
+            "description": "配置版本冲突、任务状态或参数无效"
+          }
+        }
+      }
+    },
+    "/api/harness/catalog": {
+      "post": {
+        "summary": "自动宿主的任务专属 MCP 适配器读取工具目录",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "当前任务允许的工具"
+          },
+          "401": {
+            "description": "任务凭据失效"
+          }
+        }
+      }
+    },
+    "/api/harness/tool": {
+      "post": {
+        "summary": "自动宿主以任务专属凭据调用 MCP 工具；服务端绑定任务与租约",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "object"
+                  },
+                  "operation_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "operation_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "工具结果"
+          },
+          "401": {
+            "description": "任务凭据失效"
+          },
+          "409": {
+            "description": "任务或租约无效"
+          }
+        }
+      }
+    },
+    "/mcp/agents/{role}": {
+      "post": {
+        "summary": "模块独立 Streamable HTTP MCP（各模块使用独立凭据）",
+        "security": [
+          {
+            "AgentBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "master",
+                "chat",
+                "material",
+                "capabilities",
+                "roadmap",
+                "assessment",
+                "review",
+                "final",
+                "reading",
+                "onboarding",
+                "change_review"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "MCP JSON-RPC 请求"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP JSON-RPC 响应"
+          },
+          "401": {
+            "description": "凭据失效或入口不匹配"
+          }
+        }
+      }
+    },
+    "/api/resources/goal": {
+      "post": {
+        "summary": "Associate an unassigned resource with an existing goal or create a goal atomically; preserve attachment, text, reading and notes",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "enum": [
+                      "PRIMARY",
+                      "SUPPLEMENTARY",
+                      "REFERENCE"
+                    ]
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "goal_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "goal": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150
+                      },
+                      "domain": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "scope": {
+                        "type": "string",
+                        "maxLength": 5000
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "domain"
+                    ]
+                  }
+                },
+                "required": [
+                  "resource_id",
+                  "role",
+                  "request_id"
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "goal_id"
+                    ],
+                    "not": {
+                      "required": [
+                        "goal"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "goal"
+                    ],
+                    "not": {
+                      "required": [
+                        "goal_id"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/preview": {
+      "post": {
+        "summary": "Preview unscheduled learning tasks without writes; respect dependency order, weekdays and existing calendar duration. Returns input, fingerprint, entries, skipped and total_minutes.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "session_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "start_date",
+                  "daily_minutes",
+                  "session_minutes",
+                  "weekdays"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/batch": {
+      "post": {
+        "summary": "Commit an unchanged preview atomically and idempotently. Provide the same settings and fingerprint from preview; a stale preview returns 409.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "session_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "start_date",
+                  "daily_minutes",
+                  "session_minutes",
+                  "weekdays",
+                  "fingerprint",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/reviews/followup": {
+      "post": {
+        "summary": "Schedule a review from completed assessment evidence and the current accepted requirements. Reuses a compatible pending review without changing its date or provenance. Atomic and idempotent; returns id, reused and due_date.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source_assessment_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "requirement_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "source_assessment_id",
+                  "requirement_id",
+                  "due_date",
+                  "reason",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/reviews/cancel": {
+      "post": {
+        "summary": "Cancel a pending review while preserving provenance and unresolved gaps. In-progress or completed reviews cannot be cancelled. Atomic and idempotent.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/remediation/schedule": {
+      "post": {
+        "summary": "Schedule a calendar task for a current unresolved gap in an active goal. Preserve the original gap description, reason, evidence and selected goal resources. Reuse pending work without changing its content or progress; never resolve a gap from study progress. Returns id, date and reused.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gap_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240
+                  },
+                  "activity": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "resource_ids": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "gap_id",
+                  "date",
+                  "duration",
+                  "activity",
+                  "resource_ids",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
           }
         }
       }

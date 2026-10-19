@@ -1,0 +1,8 @@
+export const moduleTools={chat:[],material:['teacher_read_material','teacher_analyze_material'],capabilities:['teacher_propose_capabilities'],roadmap:['teacher_read_material','teacher_plan_learning'],assessment:['teacher_read_material','teacher_assessment_question','teacher_assessment_feedback','teacher_finish_assessment'],review:['teacher_schedule_review','teacher_read_material','teacher_assessment_question','teacher_assessment_feedback','teacher_finish_assessment'],final:['teacher_read_material','teacher_assessment_question','teacher_assessment_feedback','teacher_finish_assessment']};
+export const configurationTools=['teacher_get_agent_configuration','teacher_propose_agent_configuration'];
+export const guidePrompt=`你是学习工作台的主 Agent，仅负责介绍项目和引导用户配置功能。介绍目标探索、资料分析、阅读答疑、能力要求、学习路线、考察、复习、最终面试、首次画像及修改追问的用途。解释 API 是本站调用模型，MCP 是外部 Agent 连接对应功能的专属入口并主动领取任务。用 teacher_get_agent_configuration 查看现有连接和未配置的功能。询问用户预算、偏好和已有模型，用 teacher_propose_agent_configuration 提出各功能的 API 或 MCP 配置方案，等待用户确认。多个功能可以明确选择同一个 API 连接，但不得默认继承主 Agent 的模型。你不处理学习任务、不调度或委派任务、不读取资料和学习对话。各功能直接使用用户确认的配置；未配置时提示补充配置，不由你兜底。不得索取或在聊天中保存 API Key，凭据由用户在专用表单填写。不能自行确认方案，不能声称待确认方案已经生效。仅配置主 Agent 只能开始项目介绍与配置引导，配置具体功能后才能使用其 AI。`;
+export function executionTools(task,context){
+ if(task.agent_role==='master')return context.orchestration?configurationTools:[];
+ const names=context.orchestration?[]:context.study?(context.study.kind==='READING'?['teacher_get_context']:context.study.kind==='ONBOARDING'?['teacher_get_context','teacher_propose_profile']:['teacher_get_context','teacher_review_changes','teacher_record_reason','teacher_propose_profile']):context.discovery?['teacher_get_context','teacher_propose_goal_draft']:moduleTools[task.module]||[];
+ return names;
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>认识你 · AI Teacher</title>
+  <link rel="stylesheet" href="/reader.css">
+</head>
+<body class="personal-page">
+  <header class="personal-topbar">
+    <a class="personal-back" href="/" aria-label="返回学习工作台"><span aria-hidden="true">←</span> 返回学习工作台</a>
+    <span class="personal-brand">AI Teacher <span>· 个人学习空间</span></span>
+  </header>
+  <main class="personal" id="personal-root">
+    <p id="error" class="personal-error" role="alert"></p>
+    <div id="overview" class="personal-overview">
+      <div class="personal-heading"><p class="eyebrow">认识你</p><h1>让学习从了解你开始</h1><p>这里保存你确认的画像，也记录最近的学习线索。</p></div>
+      <div class="personal-overview-grid">
+        <section class="panel personal-profile-card"><p class="card-kicker">你的画像</p><h2>已确认的整体画像</h2><div id="profile" class="profile-text"></div></section>
+        <section id="intro" class="panel personal-intro-card"></section>
+        <section class="panel personal-reading-card"><p class="card-kicker">学习线索</p><h2>最近在学什么</h2><p class="hint">阅读位置只是学习线索，不是掌握证据。</p><div id="reading"></div></section>
+      </div>
+    </div>
+    <div id="conversation-view" class="personal-conversation-view" hidden>
+      <div class="conversation-topline"><button id="overview-button" type="button" class="personal-overview-button">← 返回画像概览</button><span>认识你 · 对话</span></div>
+      <section id="conversation" class="personal-chat" hidden>
+        <div class="personal-chat-header"><div><p class="eyebrow">对话中</p><h2 id="chat-title">认识你</h2><p>每次只聊一个问题，你可以随时继续修正。</p></div><span class="chat-live-indicator">本机保存</span></div>
+        <div id="messages" class="personal-messages" aria-live="polite"></div>
+        <form id="chat-form" class="personal-composer"><label for="message" class="sr-only">输入消息</label><textarea id="message" placeholder="说说你的情况，或继续对话修正画像…" required maxlength="20000"></textarea><div class="composer-actions"><span>消息和回复保存在本机</span><button id="send" type="submit">发送消息 ↑</button></div></form>
+      </section>
+      <div id="suggestions"></div>
+      <section id="changes" class="panel" hidden></section>
+      <section id="ability" class="panel" hidden></section>
+    </div>
+  </main>
+  <script type="module" src="/personal.js"></script>
+</body>
+</html>

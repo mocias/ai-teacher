@@ -1,0 +1,26 @@
+const assert=require('node:assert/strict');
+exports.run=async({main,exec,click,set,submit,closeWait,until,capture,state,journey,goal,resource,today})=>{
+ const before=await state(),gap=before.learning.gaps[0],evidenceCount=before.evidence.length;
+ const schedule=async()=>{await click('[data-action="remediation-schedule"]');await until(()=>exec(`!!document.querySelector('#remediation-activity')`),'补学安排表单');await set('#remediation-activity','回看组合计算章节，先画顺序，再独立完成两个例子。');await set('#remediation-date',today);await submit();await closeWait();};
+ await schedule();let s=await state(),task=s.remediation[0],entry=s.calendar.find(e=>e.id===task.entry_id);
+ assert.equal(task.gap_id,gap.id);assert.equal(task.evidence_id,gap.evidence_id);assert.deepEqual(task.resource_ids,[resource.id]);assert.equal(entry.duration,20);
+ await journey('remediation');await capture('remediation-next');await click('[data-action="journey-next"]');await until(()=>exec(`!!document.querySelector('.remediation-study')`),'补学任务详情');
+ await set('#task-progress','40');await set('#task-notes','第一个例子已完成，下次从第二个例子继续。');await click(`#editor [data-action="reader-open"][data-id="${resource.id}"]`);
+ await until(()=>exec(`!document.querySelector('#embedded-reader').hidden`),'补学打开原资料');s=await state();assert.equal(s.calendar.find(e=>e.id===entry.id).progress,40);assert.equal(s.evidence.length,evidenceCount);
+ await main.webContents.reload();await until(()=>exec(`!!document.querySelector('.today-learning')`),'重载后今日学习');
+ await click(`.today-learning [data-action="calendar-study"][data-id="${entry.id}"]`);await until(()=>exec(`document.querySelector('#task-progress')?.value==='40'`),'保存进度恢复');assert.match(await exec(`document.querySelector('#task-notes').value`),/第二个例子/);await capture('remediation-resume');
+ await click('.remediation-study summary');await click('[data-action="remediation-source"]');await until(()=>exec(`!!document.querySelector('#editor .assessment-outcome')`),'补学来源考察');await click('#editor [data-action="close-dialog"]');
+ await journey('remediation');await click('[data-action="journey-next"]');await until(()=>exec(`!!document.querySelector('.remediation-study')`),'补学详情打开');await click('#editor [data-action="close-dialog"]');
+ await click('[data-view="home"]');await click(`[data-action="calendar-cancel"][data-id="${entry.id}"]`);await submit();await closeWait();
+ s=await state();assert.equal(s.calendar.find(e=>e.id===entry.id).cancelled,1);assert.equal(s.learning.gaps[0].status,gap.status);assert.equal(s.evidence.length,evidenceCount);
+ await journey('gap');await click('[data-action="journey-next"]');await click(`[data-action="calendar-study"][data-id="${entry.id}"]`);await until(()=>exec(`document.querySelector('#task-progress')?.disabled`),'取消补学仍可回看记录');assert.match(await exec(`document.querySelector('#task-notes').value`),/第二个例子/);await click('#editor [data-action="close-dialog"]');
+ await click('[data-action="journey-next"]');await schedule();s=await state();task=s.remediation.at(-1);assert.notEqual(task.entry_id,entry.id);
+ await journey('remediation');await click('[data-action="journey-next"]');await until(()=>exec(`!!document.querySelector('.remediation-study')`),'补学详情打开');await set('#task-progress','70');await set('#task-notes','已独立计算，准备验证。');
+ await click('[data-action="remediation-reinforce"]');await until(()=>exec(`document.querySelector('#vkind')?.value==='REINFORCEMENT'`),'补学后强化确认');await click('#editor [data-action="close-dialog"]');
+ s=await state();assert.equal(s.calendar.find(e=>e.id===task.entry_id).progress,70);assert.equal(s.evidence.length,evidenceCount);assert.equal(s.learning.gaps[0].status,gap.status);
+ await journey('remediation');await click('[data-action="journey-next"]');await until(()=>exec(`!!document.querySelector('.remediation-study')`),'补学详情打开');await set('#task-progress','100');await submit();await closeWait();
+ s=await state();assert.equal(s.learning.gaps[0].status,gap.status);assert.equal(s.evidence.length,evidenceCount);assert.equal(s.remediation.length,2);
+ await journey('gap');await click('[data-action="journey-next"]');await until(()=>exec(`document.querySelector('#editor').open&&!!document.querySelector('#editor [data-action="followup-reinforce"]')`),'补学后仍需证据验证');await capture('remediation-before-verification');
+ assert.ok(await exec(`document.querySelector('#editor').scrollWidth<=document.querySelector('#editor').clientWidth+2`),'补学面板不横向溢出');
+ return {scheduleFromGap:true,todayAndJourney:true,sourceEvidencePreserved:true,readerAutosave:true,reloadResumes:true,cancelPreservesNotes:true,reinforcementConfirmationSaves:true,progressDoesNotResolveGap:true};
+};

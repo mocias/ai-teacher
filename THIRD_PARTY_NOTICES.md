@@ -14,8 +14,11 @@ Generated from package-lock.json and installed package license/notice files. Ful
 | Package | Version | License declaration |
 | --- | --- | --- |
 | @hono/node-server | 2.1.1 | MIT |
-| @modelcontextprotocol/sdk | 1.30.0 | MIT |
+| @modelcontextprotocol/sdk | 1.32.1 | MIT |
 | ajv-formats | 3.0.1 | MIT |
+| @napi-rs/canvas | 1.0.9 | MIT |
+| @napi-rs/canvas-win32-x64-msvc | 1.0.9 | MIT |
+| @types/trusted-types | 2.0.7 | MIT |
 | accepts | 2.0.0 | MIT |
 | ajv | 8.20.0 | MIT |
 | body-parser | 2.3.0 | MIT |
@@ -30,6 +33,7 @@ Generated from package-lock.json and installed package license/notice files. Ful
 | cross-spawn | 7.0.6 | MIT |
 | debug | 4.4.3 | MIT |
 | depd | 2.0.0 | MIT |
+| dompurify | 3.4.16 | (MPL-2.0 OR Apache-2.0) |
 | dunder-proto | 1.0.1 | MIT |
 | ee-first | 1.1.1 | MIT |
 | encodeurl | 2.0.0 | MIT |
@@ -44,7 +48,7 @@ Generated from package-lock.json and installed package license/notice files. Ful
 | express-rate-limit | 8.7.0 | MIT |
 | cookie | 0.7.2 | MIT |
 | fast-deep-equal | 3.1.3 | MIT |
-| fast-uri | 3.1.2 | BSD-3-Clause |
+| fast-uri | 3.1.8 | BSD-3-Clause |
 | finalhandler | 2.1.1 | MIT |
 | forwarded | 0.2.0 | MIT |
 | fresh | 2.0.0 | MIT |
@@ -58,12 +62,13 @@ Generated from package-lock.json and installed package license/notice files. Ful
 | http-errors | 2.0.1 | MIT |
 | iconv-lite | 0.7.3 | MIT |
 | inherits | 2.0.4 | ISC |
-| ip-address | 10.7.0 | MIT |
+| ip-address | 10.7.4 | MIT |
 | is-promise | 4.0.0 | MIT |
 | isexe | 2.0.0 | ISC |
 | jose | 6.2.12 | MIT |
 | json-schema-traverse | 1.0.0 | MIT |
 | json-schema-typed | 8.0.2 | BSD-2-Clause |
+| marked | 18.0.14 | MIT |
 | math-intrinsics | 1.1.0 | MIT |
 | media-typer | 1.1.1 | MIT |
 | merge-descriptors | 2.0.0 | MIT |
@@ -78,8 +83,9 @@ Generated from package-lock.json and installed package license/notice files. Ful
 | once | 1.4.0 | ISC |
 | parseurl | 1.3.3 | MIT |
 | path-key | 3.1.1 | MIT |
+| pdfjs-dist | 6.3.289 | Apache-2.0 |
 | pkce-challenge | 5.0.1 | MIT |
-| proxy-addr | 2.0.7 | MIT |
+| proxy-addr | 2.0.8 | MIT |
 | ipaddr.js | 1.9.1 | MIT |
 | qs | 6.16.0 | BSD-3-Clause |
 | range-parser | 1.3.0 | MIT |

@@ -1,5 +1,7 @@
 import {writeFileSync,mkdirSync} from 'node:fs';
 import {tools} from '../server/tools.mjs';
+import {version} from '../server/version.mjs';
+import {learningLoopPaths} from './learning-loop-api.mjs';
 import {zodToJsonSchema} from 'zod-to-json-schema';
 mkdirSync(new URL('../docs/',import.meta.url),{recursive:true});
 const string={type:'string'},bool={type:'boolean'};
@@ -40,5 +42,6 @@ paths['/api/messages'].get={summary:'读取对话消息',security:[{UserSession:
 for(const [path,summary] of [['assessment-rounds','读取逐题记录，正式考察结束前不显示反馈'],['material-content','读取指定正文版本']])paths['/api/'+path]={...(paths['/api/'+path]||{}),get:{summary,security:[{UserSession:[]}],parameters:[{name:'id',in:'query',required:true,schema:string}],responses}};
 paths['/api/agent/tool']={post:{summary:'供外部 Agent 使用的受限业务接口',security:[{AgentBearer:[]}],requestBody:{required:true,content:{'application/json':{schema:{oneOf:Object.entries(tools).map(([name,t])=>({type:'object',properties:{name:{const:name},arguments:zodToJsonSchema(t.schema)},required:['name','arguments']}))}}}},responses}};
 paths['/mcp']={post:{summary:'标准 Streamable HTTP MCP；同一组 Agent 工具',security:[{AgentBearer:[]}],requestBody:{required:true,content:{'application/json':{schema:{type:'object'}}}},responses:{'200':{description:'MCP JSON-RPC response'},'202':{description:'Notification accepted'}}}};
-writeFileSync(new URL('../docs/openapi.json',import.meta.url),JSON.stringify({openapi:'3.1.0',info:{title:'AI Teacher Local API',version:'0.4.0',description:'仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。'},servers:[{url:'http://127.0.0.1:4317'}],components:{securitySchemes:{UserSession:{type:'apiKey',in:'cookie',name:'teacher_session'},AgentBearer:{type:'http',scheme:'bearer'}}},paths},null,2));
+Object.assign(paths,learningLoopPaths);
+writeFileSync(new URL('../docs/openapi.json',import.meta.url),JSON.stringify({openapi:'3.1.0',info:{title:'AI Teacher Local API',version,description:'仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。'},servers:[{url:'http://127.0.0.1:4317'}],components:{securitySchemes:{UserSession:{type:'apiKey',in:'cookie',name:'teacher_session'},AgentBearer:{type:'http',scheme:'bearer'}}},paths},null,2));
 console.log('OpenAPI document generated.');
