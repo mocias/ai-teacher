@@ -1,10 +1,16 @@
+import {enhanceComposer,enhanceMessages} from './chat-ui.js';
+import {bindDshModelPicker} from './dsh-model-picker.js';
+import {watchUpdates} from './live-events.js';
+import {bindReplyStream} from './reply-stream.js';
+import {messageContent} from './message-content.js';
 const $=selector=>document.querySelector(selector);
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const api=async(path,body)=>{const response=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const value=await response.json();if(!response.ok)throw Error(value.error);return value;};
 const kickoff='请用2～3分钟的对话了解我的背景、学习方向、基础、时间和偏好，每轮一个问题。';
 history.scrollRestoration='manual';
-let state,cid=new URLSearchParams(location.search).get('conversation'),active=false,busy=false,request=null,refreshing=false;
+let state,cid=new URLSearchParams(location.search).get('conversation'),active=!!new URLSearchParams(location.search).get('conversation'),busy=false,request=null,refreshing=false;
 const drafts=new Map();
+let lastMessages='';
 const showError=error=>{$('#error').textContent=error.message;};
 
 function showSection(){
@@ -49,11 +55,12 @@ function renderMessages(messages){
   const waiting=job&&['QUEUED','RUNNING'].includes(job.status)?jobStatus(job):'';
   if(message.role==='user'&&message.content===kickoff)return waiting;
   const sender=message.role==='user'?'你':'AI Teacher';
-  return `<div class="conversation-line ${message.role}"><article class="conversation-bubble"><small>${sender}</small><div>${esc(message.content)}</div></article></div>${waiting}`;
+  return `<div class="conversation-line ${message.role}"><article class="conversation-bubble"><small>${sender}</small><div class="personal-message-content">${messageContent(message)}</div></article></div>${waiting}`;
  }).join('');
- list.innerHTML=html||'<div class="conversation-empty">开始后，AI 会在这里向你提问。</div>';
+ const signature=cid+':'+html;
+ if(lastMessages!==signature){lastMessages=signature;const top=list.scrollTop;list.innerHTML=html||'<div class="conversation-empty">开始后，AI 会在这里向你提问。</div>';if(!nearBottom)list.scrollTop=top;}
  if(nearBottom||!list.dataset.rendered)list.scrollTop=list.scrollHeight;
- list.dataset.rendered='1';
+ enhanceMessages(list);list.dataset.rendered='1';bindReplyStream(list,cid,messages,'personal');
 }
 function renderExtra(){
  $('#suggestions').innerHTML=state.study.suggestions.map(item=>`<section class="panel suggestion-card"><p class="card-kicker">等待你确认</p><h2>画像建议</h2><div class="profile-text">${esc(item.content)}</div><p>${esc(item.reason)}</p><div class="row"><button data-action="confirm" data-id="${esc(item.id)}">确认采用</button><button data-action="chat" data-id="${esc(item.conversation_id)}">继续对话修正</button><button data-action="reject" data-id="${esc(item.id)}">暂不采用</button></div></section>`).join('');
@@ -73,7 +80,7 @@ async function refresh(){
    const chat=state.study.chats.find(item=>item.conversation_id===cid);
    if(!chat){cid=null;active=false;showSection();return;}
    $('#chat-title').textContent=chat.kind==='ONBOARDING'?'认识你 · 可继续对话修正':'理解这次调整';
-   renderMessages(await api('messages?conversation_id='+encodeURIComponent(cid)));
+   renderMessages(await api('messages?conversation_id='+encodeURIComponent(cid)));bindDshModelPicker($('#message').closest('form'),state,cid);enhanceComposer($('#chat-form'));
    renderExtra();
   }
  }finally{refreshing=false;}
@@ -108,4 +115,6 @@ $('#chat-form').onsubmit=async event=>{
  event.preventDefault();if(busy||!cid)return;busy=true;$('#send').disabled=true;
  try{request??=crypto.randomUUID();await api('messages',{conversation_id:cid,content:$('#message').value,request_id:request,task_kind:state.agents?.enabled?(state.study.chats.find(item=>item.conversation_id===cid)?.kind||'ONBOARDING').toLowerCase():'chat'});request=null;$('#message').value='';drafts.delete(cid);await refresh();}catch(error){showError(error);}finally{busy=false;$('#send').disabled=false;}
 };
-try{await refresh();window.scrollTo(0,0);const events=new EventSource('/api/events');events.onmessage=()=>refresh().catch(showError);setInterval(()=>refresh().catch(showError),5000);}catch(error){showError(error);}
+try{await refresh();window.scrollTo(0,0);watchUpdates(refresh,{onError:showError});}catch(error){showError(error);}
+
+window.addEventListener('dsh-model-changed',()=>refresh().catch(showError));

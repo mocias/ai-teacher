@@ -111,6 +111,7 @@ Generated from package-lock.json and installed package license/notice files. Ful
 | vary | 1.1.2 | MIT |
 | which | 2.0.2 | ISC |
 | wrappy | 1.0.2 | ISC |
+| yaml | 2.9.1 | ISC |
 | zod | 3.25.76 | MIT |
 | zod-to-json-schema | 3.25.2 | ISC |
 

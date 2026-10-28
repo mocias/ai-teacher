@@ -1,3 +1,5 @@
+import {createDshModelDirectory} from './dsh-model-directory.mjs';
+import {staticAssets} from './static-assets.mjs';
 import {agentCatalog,agentInvoke} from './agent-mcp.mjs';
 import {version} from './version.mjs';
 import {zodToJsonSchema} from 'zod-to-json-schema';
@@ -20,14 +22,20 @@ export function startServer({executorOptions={},hostOptions={},harnessOptions={}
  let finishClose;const closedPromise=new Promise(resolve=>{finishClose=resolve;});
  mkdirSync(dataDir,{recursive:true});const keyFile=resolve(dataDir,'agent-token');if(!existsSync(keyFile))writeFileSync(keyFile,randomBytes(32).toString('hex'),{mode:0o600});const token=readFileSync(keyFile,'utf8').trim();
  const store=createStore(resolve(dataDir,'teacher.sqlite'));
+ const dshDirectory=createDshModelDirectory({home:harnessOptions.dshSourceHome,runtimeHome:resolve(dataDir,'dsh-model-catalog'),detect:harnessOptions.detectDsh,...harnessOptions.modelDirectoryOptions});
+ store.agents.dshModels.setCatalogReader(()=>dshDirectory.snapshot());
+ const refreshDshForTool=async name=>{if(['teacher_get_agent_configuration','teacher_propose_agent_configuration'].includes(name))await dshDirectory.refresh();};
  const userSession=randomBytes(32).toString('hex');let closed=false;
- const listeners=new Set();let lastHostSeen=null;const notify=()=>{for(const r of listeners)r.write('data: changed\n\n');};
+ const changes=()=>store.db.prepare('SELECT total_changes() AS n').get().n;
+ const listeners=new Set();let lastHostSeen=null,lastNotified=changes();const notify=()=>{lastNotified=changes();for(const r of listeners){if(r.writableLength>1_000_000){r.destroy();continue;}r.write('data: changed\n\n');}};
+ const publishReply=value=>{const event='event: reply-stream\ndata: '+JSON.stringify(value)+'\n\n';for(const r of listeners){if(r.writableLength>1_000_000){r.destroy();continue;}r.write(event);}};
  const executor=modelExecutor(store,{...executorOptions,notify});
  const hostDriver=codexHost(store,{...hostOptions,dataDir,baseUrl:()=>`http://127.0.0.1:${server.address().port}`,notify});
- const harnessDriver=harnessHost(store,{...harnessOptions,dataDir,baseUrl:()=>`http://127.0.0.1:${server.address().port}`,notify});
+ const harnessDriver=harnessHost(store,{readDshModel:route=>dshDirectory.resolve(route),...harnessOptions,dataDir,baseUrl:()=>`http://127.0.0.1:${server.address().port}`,notify,publishReply});
  const json=(res,code,body)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
  const authorized=req=>{const got=Buffer.from((req.headers.authorization||'').replace(/^Bearer /,'')),expected=Buffer.from(token);return got.length===expected.length&&timingSafeEqual(got,expected);};
  async function body(req,limit=700000){let chunks=[],n=0;for await(const chunk of req){n+=chunk.length;if(n>limit)throw new AppError('请求过大',413);chunks.push(chunk);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw new AppError('JSON 格式无效');}}
+ const serveAsset=staticAssets();
  const server=http.createServer(async(req,res)=>{
   try{
    const host=req.headers.host||'';if(!/^(127\.0\.0\.1|localhost):\d+$/.test(host))throw new AppError('只允许本机访问',403);
@@ -50,9 +58,9 @@ export function startServer({executorOptions={},hostOptions={},harnessOptions={}
     const input=await body(req),role=path.startsWith('/mcp/agents/')?path.slice('/mcp/agents/'.length):input.role;
     if(!store.agents.authenticate(role,(req.headers.authorization||'').replace(/^Bearer /,'')))throw new AppError('Agent 凭据无效或入口不匹配',401);
     if(path==='/api/agents/catalog'){json(res,200,{tools:agentCatalog(role).map(t=>({name:t.name,description:t.description,inputSchema:zodToJsonSchema(t.schema,{$refStrategy:'none'})}))});return;}
-    if(path==='/api/agents/tool'){const result=await agentInvoke(store,role,input.name,input.arguments||{});notify();json(res,200,result);return;}
+    if(path==='/api/agents/tool'){await refreshDshForTool(input.name);const result=await agentInvoke(store,role,input.name,input.arguments||{});notify();json(res,200,result);return;}
     const mcp=new McpServer({name:'ai-teacher-'+role,version});
-    for(const t of agentCatalog(role))mcp.registerTool(t.name,{description:t.description,inputSchema:t.schema.shape},async a=>{try{const result=await agentInvoke(store,role,t.name,a);notify();return {content:[{type:'text',text:JSON.stringify(result)}]};}catch(e){return {isError:true,content:[{type:'text',text:e.message}]};}});
+    for(const t of agentCatalog(role))mcp.registerTool(t.name,{description:t.description,inputSchema:t.schema.shape},async a=>{try{await refreshDshForTool(t.name);const result=await agentInvoke(store,role,t.name,a);notify();return {content:[{type:'text',text:JSON.stringify(result)}]};}catch(e){return {isError:true,content:[{type:'text',text:e.message}]};}});
     const transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true});await mcp.connect(transport);res.on('close',()=>{transport.close();mcp.close();});await transport.handleRequest(req,res,input);return;
    }
    if(path==='/mcp'){
@@ -69,12 +77,14 @@ export function startServer({executorOptions={},hostOptions={},harnessOptions={}
     const input=await body(req);lastHostSeen=new Date().toISOString();const result=await invoke(store,input.name,input.arguments||{});notify();json(res,200,result);return;
    }
    if(path.startsWith('/api/')&&path!=='/api/health'&&path!=='/api/openapi.json'&&!(req.headers.cookie||'').split(';').some(x=>x.trim()==='teacher_session='+userSession))throw new AppError('请刷新页面以连接本地工作台',401);
-   if(path==='/api/events'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write(': connected\n\n');listeners.add(res);req.on('close',()=>listeners.delete(res));return;}
+   if(path==='/api/events'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write(': connected\n\n');listeners.add(res);for(const value of harnessDriver.replyStreams())res.write('event: reply-stream\ndata: '+JSON.stringify(value)+'\n\n');req.on('close',()=>listeners.delete(res));return;}
+   if(req.method==='GET'&&path==='/api/agents/dsh-models'){json(res,200,await dshDirectory.refresh({force:url.searchParams.get('refresh')==='1'}));return;}
+   if(req.method==='GET'&&path==='/api/reply-streams'){json(res,200,harnessDriver.replyStreams());return;}
    if(req.method==='GET'&&path==='/api/state'){store.recover();store.models.sync();json(res,200,{...store.overview(),resource_files:store.db.prepare('SELECT resource_id,name,length(content) AS size FROM resource_files').all(),host:{last_seen:lastHostSeen},local:true});return;}
    if(req.method==='GET'&&path==='/api/reader-file'){const f=await readerFile(store,url.searchParams.get('id'));res.setHeader('Content-Type',f.type);res.setHeader('Cache-Control','no-store');res.end(f.bytes);return;}
    if(req.method==='GET'&&path==='/api/reading-annotations'){json(res,200,store.study.annotations(url.searchParams.get('id')));return;}
    if(req.method==='GET'&&path==='/api/resource-file'){const file=store.db.prepare('SELECT name,content FROM resource_files WHERE resource_id=?').get(url.searchParams.get('id'));if(!file)throw new AppError('文件不存在',404);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(file.name).replace(/['()*]/g,c=>'%'+c.charCodeAt(0).toString(16)));res.setHeader('Cache-Control','no-store');res.end(Buffer.from(file.content));return;}
-   if(req.method==='GET'&&path==='/api/health'){json(res,200,{ok:true,service:'ai-teacher',version,features:['study-reader','harness-routing','learning-loop','review-followups','remediation-plans'],data_id:dataId});return;}
+   if(req.method==='GET'&&path==='/api/health'){json(res,200,{ok:true,service:'ai-teacher',version,features:['study-reader','harness-routing','learning-loop','review-followups','remediation-plans','calendar-recovery','dsh-harness','dsh-discovery','dsh-desktop-model','dsh-sessions','dsh-shared-workspace','chat-markdown-ui','dsh-reply-streaming','workspace-performance','dsh-model-picker','chat-studio-ui','dsh-runtime-models'],data_id:dataId});return;}
    if(req.method==='GET'&&path==='/api/messages'){json(res,200,store.messages(url.searchParams.get('conversation_id')));return;}
    if(req.method==='GET'&&path==='/api/assessment-rounds'){json(res,200,store.learning.rounds({id:url.searchParams.get('id')}));return;}
    if(req.method==='GET'&&path==='/api/material-content'){json(res,200,store.learning.readMaterial({content_id:url.searchParams.get('id')}));return;}
@@ -86,6 +96,10 @@ export function startServer({executorOptions={},hostOptions={},harnessOptions={}
     if(req.headers.authorization)throw new AppError('Agent 不可调用用户维护接口',403);
     const a=await body(req,path==='/api/resources'?28000000:700000);let result;const tracked=['/api/notes','/api/notes/archive','/api/calendar','/api/calendar/cancel','/api/calendar/move','/api/discussions/draft','/api/study/edit'].includes(path);const before=tracked?store.study.auditSnapshot():null;
     switch(path){
+     case '/api/agents/dsh-model':if(a.model){const models=await dshDirectory.refresh();if(models.error)throw new AppError(models.error,409);}store.agents.dshModels.validate(a.model);store.models.sync();result=store.agents.dshModels.save(a.conversation_id,a.model);break;
+     case '/api/agents/detect-dsh':result=await harnessDriver.detectDsh({refresh:a.refresh===true});break;
+     case '/api/agents/dsh-session/check':result=harnessDriver.checkSession(a);break;
+     case '/api/agents/dsh-session/reset':result=harnessDriver.resetSession(a);break;
      case '/api/agents/configure':result=store.agents.configure(a);break;
      case '/api/agents/token':{result=store.agents.token(a.role);result.stdio={mcpServers:{['ai-teacher-'+a.role]:{command:process.execPath,args:[fileURLToPath(new URL('../scripts/agent-mcp.mjs',import.meta.url))],env:{TEACHER_URL:`http://127.0.0.1:${server.address().port}`,TEACHER_AGENT_ROLE:a.role,TEACHER_TOKEN:result.token}}}};break;}
      case '/api/agents/decide':result=store.agents.decide(a);break;
@@ -118,6 +132,9 @@ export function startServer({executorOptions={},hostOptions={},harnessOptions={}
 
      case '/api/calendar':result=store.calendar.save(a);break;
      case '/api/remediation/schedule':result=store.remediation.schedule(a);break;
+     case '/api/calendar/recovery-options':result=store.recovery.options(a);break;
+     case '/api/calendar/recovery-preview':result=store.recovery.preview(a);break;
+     case '/api/calendar/recovery-commit':result=store.recovery.commit(a);break;
      case '/api/calendar/preview':result=store.calendar.preview(a);break;
      case '/api/calendar/batch':result=store.calendar.batch(a);break;
      case '/api/calendar/done':result=store.calendar.done(a);break;
@@ -163,18 +180,19 @@ export function startServer({executorOptions={},hostOptions={},harnessOptions={}
      default:throw new AppError('接口不存在',404);
     }if(before)store.study.audit(before);notify();json(res,200,result);return;
    }
-   if(req.method==='GET'&&/^\/vendor\/(cmaps|standard_fonts|wasm)\/[A-Za-z0-9_.-]+$/.test(path)){res.setHeader('Content-Type',path.endsWith('.wasm')?'application/wasm':'application/octet-stream');res.end(readFileSync(new URL('../node_modules/pdfjs-dist/'+path.slice(8),import.meta.url)));return;}
+   if(req.method==='GET'&&/^\/vendor\/(cmaps|standard_fonts|wasm)\/[A-Za-z0-9_.-]+$/.test(path)){await serveAsset(req,res,new URL('../node_modules/pdfjs-dist/'+path.slice(8),import.meta.url),path.endsWith('.wasm')?'application/wasm':'application/octet-stream');return;}
    const vendors={'/vendor/pdf.mjs':'pdfjs-dist/build/pdf.mjs','/vendor/pdf.worker.mjs':'pdfjs-dist/build/pdf.worker.mjs','/vendor/marked.js':'marked/lib/marked.esm.js','/vendor/purify.js':'dompurify/dist/purify.es.mjs'};
-   if(req.method==='GET'&&vendors[path]){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(readFileSync(new URL('../node_modules/'+vendors[path],import.meta.url)));return;}
-   const files={'/remediation.js':'remediation.js','/followups.js':'followups.js','/journey.js':'journey.js','/agents.js':'agents.js','/agents.html':'agents.html','/agent-chat.js':'agent-chat.js','/reader.html':'reader.html','/reader.js':'reader.js','/reader.css':'reader.css','/document.html':'document.html','/document.js':'document.js','/personal.html':'personal.html','/personal.js':'personal.js','/':'index.html','/app.js':'app.js','/resources.js':'resources.js','/discovery.js':'discovery.js','/calendar.js':'calendar.js','/tasks.js':'tasks.js','/roadmap.js':'roadmap.js','/details.js':'details.js','/learning.js':'learning.js','/models.js':'models.js','/host.js':'host.js','/style.css':'style.css'};
+   if(req.method==='GET'&&vendors[path]){await serveAsset(req,res,new URL('../node_modules/'+vendors[path],import.meta.url),'text/javascript; charset=utf-8');return;}
+   const files={'/chat-ui.js':'chat-ui.js','/conversation.css':'conversation.css','/dsh-model-picker.css':'dsh-model-picker.css','/dsh-model-picker.js':'dsh-model-picker.js','/workspace.css':'workspace.css','/live-events.js':'live-events.js','/reply-stream.js':'reply-stream.js','/message-content.js':'message-content.js','/message-content.css':'message-content.css','/recovery.js':'recovery.js','/remediation.js':'remediation.js','/followups.js':'followups.js','/journey.js':'journey.js','/agents.js':'agents.js','/agents.html':'agents.html','/agent-chat.js':'agent-chat.js','/reader.html':'reader.html','/reader.js':'reader.js','/reader.css':'reader.css','/document.html':'document.html','/document.js':'document.js','/personal.html':'personal.html','/personal.js':'personal.js','/':'index.html','/app.js':'app.js','/resources.js':'resources.js','/discovery.js':'discovery.js','/calendar.js':'calendar.js','/tasks.js':'tasks.js','/roadmap.js':'roadmap.js','/details.js':'details.js','/learning.js':'learning.js','/models.js':'models.js','/host.js':'host.js','/style.css':'style.css'};
    if(req.method!=='GET'||!files[path])throw new AppError('页面不存在',404);
    if(['/', '/reader.html','/personal.html','/agents.html'].includes(path))res.setHeader('Set-Cookie',`teacher_session=${userSession}; HttpOnly; SameSite=Strict; Path=/`);
-   res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(files[path])]);res.end(readFileSync(new URL('../public/'+files[path],import.meta.url)));
+   await serveAsset(req,res,new URL('../public/'+files[path],import.meta.url),({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'})[extname(files[path])]);
   }catch(e){if(!res.headersSent)json(res,e.status||400,{error:e.name==='ZodError'?'工具参数不符合要求':e.message});else res.end();}
  });
- const studyTimer=setInterval(()=>{try{store.study.tick();}catch{}},5000);studyTimer.unref();
- const heartbeat=setInterval(()=>{store.recover();for(const r of listeners)r.write(': heartbeat\n\n');},15000);heartbeat.unref();
- server.on('close',()=>{clearInterval(studyTimer);clearInterval(heartbeat);Promise.all([executor.stop(),hostDriver.stop(),harnessDriver.stop()]).then(()=>{store.db.close();finishClose();});});
+ const backgroundUpdate=operation=>{operation();if(changes()!==lastNotified)notify();};
+ const studyTimer=setInterval(()=>{try{backgroundUpdate(()=>store.study.tick());}catch{}},5000);studyTimer.unref();
+ const heartbeat=setInterval(()=>{backgroundUpdate(()=>store.recover());for(const r of listeners)r.write(': heartbeat\n\n');},15000);heartbeat.unref();
+ server.on('close',()=>{clearInterval(studyTimer);clearInterval(heartbeat);Promise.all([dshDirectory.close(),executor.stop(),hostDriver.stop(),harnessDriver.stop()]).then(()=>{store.db.close();finishClose();});});
  server.listen(port,'127.0.0.1',()=>console.log(`AI Teacher: http://127.0.0.1:${server.address().port}`));
  return {server,store,token,executor,hostDriver,harnessDriver,close:()=>{if(closed)return closedPromise;closed=true;for(const r of listeners)r.end();server.closeAllConnections();server.close();return closedPromise;}};
 }

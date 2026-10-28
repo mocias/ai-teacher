@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>认识你 · AI Teacher</title>
   <link rel="stylesheet" href="/reader.css">
-</head>
+<link rel="stylesheet" href="/workspace.css"><link rel="stylesheet" href="/conversation.css"></head>
 <body class="personal-page">
   <header class="personal-topbar">
     <a class="personal-back" href="/" aria-label="返回学习工作台"><span aria-hidden="true">←</span> 返回学习工作台</a>
@@ -25,7 +25,7 @@
       <div class="conversation-topline"><button id="overview-button" type="button" class="personal-overview-button">← 返回画像概览</button><span>认识你 · 对话</span></div>
       <section id="conversation" class="personal-chat" hidden>
         <div class="personal-chat-header"><div><p class="eyebrow">对话中</p><h2 id="chat-title">认识你</h2><p>每次只聊一个问题，你可以随时继续修正。</p></div><span class="chat-live-indicator">本机保存</span></div>
-        <div id="messages" class="personal-messages" aria-live="polite"></div>
+        <div id="messages" class="personal-messages" role="log" tabindex="0" aria-label="画像对话记录" aria-live="polite"></div>
         <form id="chat-form" class="personal-composer"><label for="message" class="sr-only">输入消息</label><textarea id="message" placeholder="说说你的情况，或继续对话修正画像…" required maxlength="20000"></textarea><div class="composer-actions"><span>消息和回复保存在本机</span><button id="send" type="submit">发送消息 ↑</button></div></form>
       </section>
       <div id="suggestions"></div>

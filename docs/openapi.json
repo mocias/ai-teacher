@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AI Teacher Local API",
-    "version": "0.7.0",
+    "version": "0.14.1",
     "description": "仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。"
   },
   "servers": [
@@ -3326,6 +3326,161 @@
         }
       }
     },
+    "/api/agents/dsh-session/check": {
+      "post": {
+        "summary": "Check a conversation's persistent DSH session or explicitly restore its verified checkpoint; does not retry a learning job",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "conversation_id"
+                ],
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "restore": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current binding with session_id, generation, state, cwd and checkpoint metadata; no credentials"
+          },
+          "401": {
+            "description": "User session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot manage sessions"
+          },
+          "409": {
+            "description": "Live process, invalid workspace, unavailable or invalid checkpoint"
+          }
+        }
+      }
+    },
+    "/api/agents/dsh-session/reset": {
+      "post": {
+        "summary": "Explicitly archive the old DSH binding and allocate a new generation for the same conversation; keeps prior logs and workspace files",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "conversation_id"
+                ],
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New active binding in NEW state; next DSH task creates the new session from the site's history"
+          },
+          "401": {
+            "description": "User session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot rebuild sessions"
+          },
+          "409": {
+            "description": "Session has a live process or running job"
+          }
+        }
+      }
+    },
+    "/api/agents/detect-dsh": {
+      "post": {
+        "summary": "Detect local DSH from PATH, installed applications, running processes and shortcuts; verify its CLI version",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refresh": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detection result; no settings are changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "found": {
+                      "type": "boolean"
+                    },
+                    "executable": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "found",
+                    "executable",
+                    "version",
+                    "source",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot access detection"
+          }
+        }
+      }
+    },
     "/api/agents/configure": {
       "post": {
         "summary": "配置主 Agent 或模块分工",
@@ -3376,9 +3531,10 @@
                     "enum": [
                       "MANUAL",
                       "CODEX",
-                      "CLAUDE"
+                      "CLAUDE",
+                      "DSH"
                     ],
-                    "description": "仅 MCP 模式使用；CODEX 或 CLAUDE 由本机服务自动启动，MANUAL 由外部 Agent 主动领取"
+                    "description": "仅 MCP 模式使用；CODEX、CLAUDE 或 DSH 由本机服务自动启动，MANUAL 由外部 Agent 主动领取"
                   },
                   "executable": {
                     "type": "string",
@@ -3386,7 +3542,7 @@
                   },
                   "model": {
                     "type": "string",
-                    "description": "可选的宿主模型标识"
+                    "description": "可选的宿主模型标识；DSH 可填模型 ID（deepseek-official）或 provider/model，留空优先使用全局/headless 明确设置，否则沿用 Desktop 的模型及对应服务商声明"
                   }
                 },
                 "required": [
@@ -4302,6 +4458,311 @@
           },
           "409": {
             "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/recovery-options": {
+      "post": {
+        "summary": "List unfinished calendar entries before the browser-local as_of date with eligibility reasons. Does not modify data.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "as_of": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "as_of"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/recovery-preview": {
+      "post": {
+        "summary": "Preview rescheduling selected overdue tasks. Respect prerequisites, existing daily load and weekdays. Preserve identifiers, progress and notes. Returns input, fingerprint, entries, total_minutes and days.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "as_of": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  },
+                  "entry_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "as_of",
+                  "start_date",
+                  "daily_minutes",
+                  "weekdays",
+                  "entry_ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/recovery-commit": {
+      "post": {
+        "summary": "Atomically commit unchanged recovery preview. Reject stale calendar or learning state. Idempotent with request_id. Changes only dates and within-day positions.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "as_of": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  },
+                  "entry_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "as_of",
+                  "start_date",
+                  "daily_minutes",
+                  "weekdays",
+                  "entry_ids",
+                  "fingerprint",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/reply-streams": {
+      "get": {
+        "summary": "Read volatile DSH reply previews for reconnect; not saved messages",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded snapshots with run_id, conversation_id, job_id, reply_to, attempt, revision, content, status and optional saved message_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Browser user session required"
+          }
+        }
+      }
+    },
+    "/api/agents/dsh-models": {
+      "get": {
+        "summary": "Read locally declared DSH model IDs and labels; no credentials, endpoint headers, or network model requests.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "models, default_model, source, optional error"
+          },
+          "401": {
+            "description": "User session required"
+          }
+        }
+      }
+    },
+    "/api/agents/dsh-model": {
+      "post": {
+        "summary": "Save a per-conversation DSH model choice for future messages; an empty model follows function/DSH defaults.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 150
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "model"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved preference"
+          },
+          "401": {
+            "description": "User session required"
+          },
+          "409": {
+            "description": "Unknown conversation or model"
           }
         }
       }

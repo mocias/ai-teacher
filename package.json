@@ -1,6 +1,6 @@
 {
   "name": "ai-teacher-local",
-  "version": "0.7.0",
+  "version": "0.14.1",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -18,13 +18,17 @@
     "test:desktop:learning": "node scripts/smoke-desktop.mjs --learning",
     "test:desktop:followups": "node scripts/smoke-desktop.mjs --followups",
     "licenses:generate": "node scripts/generate-licenses.mjs",
-    "test:desktop:remediation": "node scripts/smoke-desktop.mjs --remediation"
+    "test:desktop:remediation": "node scripts/smoke-desktop.mjs --remediation",
+    "test:desktop:recovery": "node scripts/smoke-desktop.mjs --recovery",
+    "test:desktop:performance": "node scripts/smoke-desktop.mjs --performance",
+    "test:desktop:models": "node scripts/smoke-desktop.mjs --model-picker"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "dompurify": "^3.4.16",
     "marked": "^18.0.14",
     "pdfjs-dist": "^6.3.289",
+    "yaml": "^2.9.1",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.25.2"
   },

@@ -6,7 +6,7 @@ const {join}=require('node:path');
 // A deterministic local model exercises the real executor, tools, database and UI.
 // It validates workflow plumbing, not the quality of an external teaching model.
 exports.run=async(main,base)=>{
- const extended=process.argv.includes('--followup-smoke'),evidenceCount=extended?7:5;let followups;
+ const extended=process.argv.includes('--followup-smoke'),evidenceCount=extended?7:5;let followups,recovery;
  main.showInactive();
  const exec=code=>main.webContents.executeJavaScript(code).catch(e=>{throw Error(e.message+'\nWhile executing: '+code.slice(0,500));});
  const state=()=>exec(`fetch('/api/state').then(r=>r.json())`);
@@ -17,7 +17,7 @@ exports.run=async(main,base)=>{
  const set=(selector,value)=>exec(`document.querySelector(${JSON.stringify(selector)}).value=${JSON.stringify(value)};document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new Event('input',{bubbles:true}))`);
  const submit=()=>exec(`document.querySelector('#dialog-form').requestSubmit(document.querySelector('#dialog-form button[type=submit]'))`);
  const closeWait=()=>until(()=>exec(`!document.querySelector('#editor').open`),'对话框保存关闭');
- const capture=async name=>writeFileSync(join(process.env.TEACHER_SMOKE_OUTPUT,name+'.png'),(await main.webContents.capturePage()).toPNG());
+ const capture=async name=>{for(let attempt=0;attempt<3;attempt++){try{writeFileSync(join(process.env.TEACHER_SMOKE_OUTPUT,name+'.png'),(await main.webContents.capturePage()).toPNG());return;}catch(error){if(error.message!=='UnknownVizError'||attempt===2)throw error;await new Promise(r=>setTimeout(r,200));}}};
  const server=http.createServer((req,res)=>{let raw='';req.on('data',b=>raw+=b);req.on('end',()=>{try{
   const body=JSON.parse(raw),{task,context}=JSON.parse(body.messages[1].content),L=context.learning;
   const invoked=body.messages.flatMap(m=>m.tool_calls||[]).map(c=>c.function.name);
@@ -82,6 +82,7 @@ exports.run=async(main,base)=>{
   await submit();await until(()=>exec(`document.querySelector('#schedule-preview')?.textContent.includes('2 项 / 60 分钟')`),'排期预览');
   assert.equal((await state()).calendar.length,0,'预览不能写入日历');await capture('learning-schedule');await submit();await closeWait();
   s=await state();assert.equal(s.calendar.length,2);assert.equal(s.calendar[0].title,'理解输入与返回值');assert.equal(s.evidence.length,1);
+  if(process.argv.includes('--recovery-smoke'))recovery=await require('./recovery-smoke.cjs').run({main,exec,post,click,set,submit,closeWait,until,capture,state,today});
   await click('[data-view="home"]');await until(()=>exec(`document.querySelector('.today-learning')?.textContent.includes('理解输入与返回值')`),'首页每日任务');await capture('learning-today');
   for(const entry of s.calendar){
    await click('[data-view="home"]');await click(`[data-action="calendar-study"][data-id="${entry.id}"]`);
@@ -103,6 +104,7 @@ exports.run=async(main,base)=>{
   await main.loadURL(base);await until(()=>exec(`!!document.querySelector('[data-view="journey"]')`),'重载');
   const persisted=await state();if(process.argv.includes('--remediation-smoke')){assert.equal(persisted.remediation.length,2);assert.equal(persisted.calendar.filter(e=>e.cancelled).length,1);}assert.equal(persisted.evidence.length,evidenceCount);assert.equal(persisted.resources.find(r=>r.id===resource.id).goal_id,goal.id);if(extended)assert.equal(persisted.learning.review_sources.length,2);
   const result={ok:true,localMock:true,importFromUI:true,readerToGoal:true,materialAnalysis:true,confirmedCapabilities:true,initialDiagnostic:true,confirmedRoadmap:true,previewBeforeCommit:true,batchTasks:2,dailyProgress:true,reviewFromToday:true,learningAssessments:2,finalInterview:true,goalSnapshot:true,evidenceCount,reloadPreserved:true,...(followups?{followups}:{}),calls};
+  if(recovery)result.recovery=recovery;
   writeFileSync(join(process.env.TEACHER_SMOKE_OUTPUT,'learning-loop.json'),JSON.stringify(result,null,2));console.log('LEARNING_LOOP_SMOKE_OK '+JSON.stringify(result));
  }catch(e){writeFileSync(join(process.env.TEACHER_SMOKE_OUTPUT,'learning-loop-failure.json'),JSON.stringify({error:e.message,calls,state:await state()},null,2));await capture('learning-loop-failure');throw e;}
  finally{await post('models/enabled',{enabled:false});server.closeAllConnections();await new Promise(r=>server.close(r));}

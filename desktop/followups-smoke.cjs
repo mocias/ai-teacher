@@ -22,7 +22,7 @@ exports.run=async({main,exec,click,set,submit,closeWait,until,capture,state,answ
  await click('[data-view="learning"]');await report();await click('#editor [data-action="followup-schedule"]');await until(()=>exec(`!!document.querySelector('#followup-date')`),'重新安排');await set('#followup-date',today);await submit();await closeWait();
  await report();await click('#editor [data-action="followup-gap"]');await until(()=>exec(`!!document.querySelector('#editor [data-action="reader-open"]')`),'薄弱点关联资料');
  await click(`#editor [data-action="reader-open"][data-id="${resource.id}"]`);await until(()=>exec(`!document.querySelector('#embedded-reader').hidden`),'回看原资料');
- const frame=main.webContents.mainFrame.frames.find(f=>f.url.includes('/reader.html'));await until(()=>frame.executeJavaScript(`document.querySelector('#reading-title')?.textContent.includes('函数')`),'同一份资料');assert.equal((await state()).evidence.length,4,'回看资料不会生成能力证据');
+ await until(async()=>{const frame=main.webContents.mainFrame.frames.find(f=>f.url.includes('/reader.html'));return frame&&await frame.executeJavaScript(`document.querySelector('#reading-title')?.textContent.includes('函数')`);},'同一份资料');assert.equal((await state()).evidence.length,4,'回看资料不会生成能力证据');
  await journey('review');await click('[data-action="journey-next"]');await answer('REVIEW',true);
  await until(()=>exec(`!!document.querySelector('.assessment-outcome.compact')`),'完成考察后直接显示结果入口');
  await click('.assessment-outcome.compact [data-action="v2-results"]');await until(()=>exec(`document.querySelector('#editor')?.textContent.includes('发现相反表现')`),'复习发现仍有问题');

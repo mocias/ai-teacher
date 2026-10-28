@@ -4,7 +4,8 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {once} from 'node:events';
 import {startServer} from '../server/index.mjs';
-const harness=process.argv[2]==='claude'?'CLAUDE':'CODEX';
+const harness={claude:'CLAUDE',codex:'CODEX',dsh:'DSH'}[process.argv[2]||'codex'];
+if(!harness)throw Error('Usage: node scripts/smoke-harness.mjs codex|claude|dsh');
 const dir=mkdtempSync(join(tmpdir(),'ai-teacher-real-harness-'));
 const app=startServer({port:0,dataDir:dir,executorOptions:{intervalMs:1e9},hostOptions:{intervalMs:1e9},harnessOptions:{intervalMs:1e9,timeoutMs:120000}});
 try{

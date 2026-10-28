@@ -7,7 +7,7 @@
 首次在“模型与分工”连接主 Agent，即可进入项目介绍与配置引导。仅配置主 Agent 不等于已配置学习功能。用户可以让它提出各功能的配置方案，经确认后生效；也可以直接手动设置。已有模型连接可以被多个功能明确选用，包括与主 Agent 相同的 API 连接，但不会自动继承。
 
 - **API**：本站直接调用该功能选定的模型。选择已有连接，或填写名称、Base URL、准确模型名及 Key，支持 OpenAI 兼容 Chat Completions 和 function tools。
-- **宿主 + MCP**：选 Codex 或 Claude Code 时，本站为每条消息启动已登录的本机宿主，任务专属 MCP 提供上下文和回写工具。也可以选手动 MCP，让外部 Agent 主动领取任务。
+- **宿主 + MCP**：选 Codex、Claude Code 或 DSH 时，本站为每条消息启动已登录的本机宿主，任务专属 MCP 提供上下文和回写工具。也可以选手动 MCP，让外部 Agent 主动领取任务。
 - **暂不配置**：功能的 AI 任务保留在等待队列，提示配置。不会自动调用主 Agent 或其他功能的模型。
 
 主 Agent 能读取不含凭据的连接信息、查看哪些功能未配置、提出配置方案及新 API 连接的名称／模型／地址。它不能确认自己的提案，不能读取学习资料或学习对话。Key 由用户在专用表单中输入，不应放进聊天。
@@ -28,9 +28,9 @@
 
 ## 站点自动启动宿主
 
-Codex 使用官方非交互 CLI `codex exec`，Claude Code 使用 `claude -p`。站点把本条用户消息送入宿主进程，并附上只适用于该任务的 MCP stdio 适配器。宿主必须调用 `teacher_get_context`，再调用相应工具写回；普通回答必须由 `teacher_reply` 入库。终端最终文本不会被当成学习回复。MCP 在这里提供工具能力，并不作为通用的“向任意宿主投递对话”协议。
+Codex 使用官方非交互 CLI `codex exec`，Claude Code 使用 `claude -p`，DSH 使用 `dsh --profile headless --patch <临时配置> --json -`。站点把本条用户消息送入宿主进程，并附上只适用于该任务的 MCP stdio 适配器。宿主必须调用 `teacher_get_context`，再调用相应工具写回；普通回答必须由 `teacher_reply` 入库。终端最终文本不会被当成学习回复。MCP 在这里提供工具能力，并不作为通用的“向任意宿主投递对话”协议。
 
-每个功能可单独选择宿主、可选模型和可执行文件路径。Codex 在 Windows 桌面应用中会查找本机 Codex 安装目录；Claude Code 默认从 PATH 查找，可填写绝对路径。两者均使用各自的本机登录状态。自动任务的凭据仅在该任务运行时有效，工具隐藏并由服务端绑定 `job_id`、租约和请求 ID。站点不会把 API Key 传给宿主。执行退出而未成功写回时，任务阻塞，页面显示失败原因，用户可在检查后显式重试。
+每个功能可单独选择宿主、可选模型和可执行文件路径。Codex 在 Windows 桌面应用中会查找本机 Codex 安装目录；Claude Code 默认从 PATH 查找，可填写绝对路径。Codex / Claude Code 使用各自的本机登录状态；DSH 使用本机 headless 模型配置和 DSH 凭据服务，具体见 [DSH 宿主支持](DSH-HOST.md)。自动任务的凭据仅在该任务运行时有效，工具隐藏并由服务端绑定 `job_id`、租约和请求 ID。站点不会把 API Key 传给宿主。执行退出而未成功写回时，任务阻塞，页面显示失败原因，用户可在检查后显式重试。
 
 Claude Code 的 CLI 启动和任务专属 MCP 配置已用模拟进程检查；本机尚未安装 Claude Code，因此真实 Claude 登录与推理需在安装后验证。
 

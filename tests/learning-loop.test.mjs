@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {version} from '../server/version.mjs';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -79,7 +80,7 @@ test('journey follows current capability version, prioritizes assessment and due
 test('new workflow endpoints require browser session and reject Agent credentials',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'teacher-loop-http-')),app=startServer({port:0,dataDir:dir});await once(app.server,'listening');t.after(async()=>{await app.close();rmSync(dir,{recursive:true,force:true});});
  const base='http://127.0.0.1:'+app.server.address().port,cookie=(await fetch(base)).headers.get('set-cookie').split(';')[0];
- const health=await (await fetch(base+'/api/health')).json();assert.equal(health.version,'0.7.0');assert.ok(health.features.includes('learning-loop'));assert.ok(health.features.includes('review-followups'));assert.ok(health.features.includes('remediation-plans'));
+ const health=await (await fetch(base+'/api/health')).json();assert.equal(health.version,version);assert.ok(health.features.includes('learning-loop'));assert.ok(health.features.includes('review-followups'));assert.ok(health.features.includes('remediation-plans'));assert.ok(health.features.includes('calendar-recovery'));
  const post=(route,body,headers={Cookie:cookie})=>fetch(base+'/api/'+route,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
  for(const endpoint of ['resources/goal','calendar/preview','calendar/batch']){assert.equal((await post(endpoint,{},{})).status,401);assert.equal((await post(endpoint,{},{Cookie:cookie,Authorization:'Bearer '+app.token})).status,403);}
  const r=app.store.resource({title:'测试材料'});const linked=await post('resources/goal',{resource_id:r.id,role:'PRIMARY',goal:{title:'测试目标',domain:'测试'},request_id:id()});assert.equal(linked.status,200);assert.ok((await linked.json()).goal_id);
