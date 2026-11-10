@@ -59,7 +59,7 @@ exports.run=async(main,base)=>{
  await post('agents/configure',{role:'chat',mode:'MCP',harness:'MANUAL'});
  const {token:chatToken}=await post('agents/token',{role:'chat'}),discussion=await post('discussions',{request_id:crypto.randomUUID()});
  await exec(`localStorage.setItem('teacher-discussion',${JSON.stringify(discussion.conversation_id)})`);
- await main.loadURL(base+'/');await until(()=>exec(`!!document.querySelector('#discovery-input')`),'discovery composer');
+ await main.loadURL(base+'/?home_chat=discovery');await until(()=>exec(`!!document.querySelector('#discovery-input')`),'discovery composer');
  await post('messages',{conversation_id:discussion.conversation_id,content:'如何开始学习？',request_id:crypto.randomUUID()});
  await exec(`(()=>{const x=document.querySelector('#discovery-input');x.value='我正在输入的新草稿';x.dispatchEvent(new Event('input',{bubbles:true}));x.focus();x.setSelectionRange(2,5);})()`);
  const chatTool=async(name,args)=>{const r=await fetch(base+'/api/agents/tool',{method:'POST',headers:{Authorization:'Bearer '+chatToken,'Content-Type':'application/json'},body:JSON.stringify({role:'chat',name,arguments:args})});const v=await r.json();if(!r.ok)throw Error(v.error);return v;};
@@ -69,7 +69,8 @@ exports.run=async(main,base)=>{
  assert.equal(await exec(`document.querySelector('#discovery-input').value`),'我正在输入的新草稿');
  assert.equal(await exec(`document.activeElement.id`),'discovery-input');
  assert.deepEqual(await exec(`[document.activeElement.selectionStart,document.activeElement.selectionEnd]`),[2,5]);
- const result={markdown:true,sanitized:true,fixedComposer:true,narrowLayout:true,autoGrowingComposer:true,copyReply:true,draftRecovery:true,failedSendRetainsDraft:true,readingPositionPreserved:true,realMcpWriteback:true,dshVisibilityExplained:true,discoveryRefreshWhileTyping:true};
+ await require('./scroll-smoke.cjs').run({main,base,exec,post,chatTool,until});
+ const result={longConversationScroll:true,streamFollowAndHistory:true,markdown:true,sanitized:true,fixedComposer:true,narrowLayout:true,autoGrowingComposer:true,copyReply:true,draftRecovery:true,failedSendRetainsDraft:true,readingPositionPreserved:true,realMcpWriteback:true,dshVisibilityExplained:true,discoveryRefreshWhileTyping:true};
  if(process.env.TEACHER_SMOKE_OUTPUT)writeFileSync(join(process.env.TEACHER_SMOKE_OUTPUT,'chat-ui-result.json'),JSON.stringify(result,null,2));
  console.log('CHAT_UI_SMOKE_OK '+JSON.stringify(result));
 };

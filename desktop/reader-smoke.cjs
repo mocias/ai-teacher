@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
 const http=require('node:http');
 exports.run=async(main,base)=>{
  // Scroll events are tied to Chromium's rendering lifecycle; exercise a visible window.
- main.showInactive();
+ main.show();main.focus();
  const exec=(w,code)=>w.webContents.executeJavaScript(code);
  async function until(fn,label){const end=Date.now()+25000;while(Date.now()<end){try{const x=await fn();if(x)return x;}catch{}await new Promise(r=>setTimeout(r,100));}throw Error('等待超时：'+label);}
  const capture=async w=>{await cmd('overlay',{visible:true});try{return await until(async()=>{return (await w.webContents.capturePage()).toPNG();},'截图');}finally{await cmd('overlay',{visible:false});}};
@@ -42,8 +42,14 @@ exports.run=async(main,base)=>{
   await execFrame(`document.querySelectorAll('[data-tab]')[1].click()`);
   await until(async()=>{const v=await cmd('snapshot');return v?.content?.includes('Web readable');},'切回网页后再滚动');
   const webView=reader.contentView.children.find(v=>v.webContents?.getURL()===url);
-  await webView.webContents.executeJavaScript(`document.querySelector('#next').scrollIntoView()`);
-  await until(()=>execFrame(`document.querySelector('#position').textContent==='Second web chapter'`),'网页第二章');
+  // Windows can occlude an inactive smoke window: scrollY changes but Chromium
+  // defers scroll events. Require a rendered page before testing event delivery.
+  main.show();main.focus();
+  await until(()=>webView.webContents.executeJavaScript(`document.visibilityState==='visible'`),'网页进入可见渲染状态');
+  await webView.webContents.executeJavaScript(`window.__smokeScrollEvents=0;addEventListener('scroll',()=>window.__smokeScrollEvents++);document.querySelector('#next').scrollIntoView()`);
+  await until(()=>execFrame(`document.querySelector('#position').textContent==='Second web chapter'`),'网页第二章').catch(async error=>{
+   console.log('READER_SCROLL_DIAGNOSTIC',JSON.stringify({visible:webView.getVisible(),bounds:webView.getBounds(),page:await webView.webContents.executeJavaScript(`({scrollY,innerHeight,visibility:document.visibilityState,events:window.__smokeScrollEvents,nextTop:document.querySelector('#next').getBoundingClientRect().top,headings:[...document.querySelectorAll('h1,h2,h3')].map(h=>({text:h.textContent,top:h.getBoundingClientRect().top}))})`),ui:await execFrame(`({position:document.querySelector('#position').textContent,status:document.querySelector('#status').textContent})`)}));throw error;
+  });
   await until(()=>exec(main,`fetch('/api/state').then(r=>r.json()).then(s=>s.study.progress.some(p=>p.location==='Second web chapter'))`),'网页位置保存');
   await execFrame(`document.querySelectorAll('[data-close]')[1].click()`);
   await until(()=>execFrame(`document.querySelectorAll('[data-tab]').length===1`),'关闭网页标签');

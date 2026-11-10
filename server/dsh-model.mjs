@@ -5,13 +5,14 @@ import {parseDocument,isMap,isSeq,isAlias} from 'yaml';
 
 const fail=message=>{throw Object.assign(new Error(message),{status:409});};
 const dynamic=node=>!!node&&(isAlias(node)||node.tag==='tag:yaml.org,2002:js'||(node.items||[]).some(item=>dynamic(item?.key)||dynamic(item?.value)||dynamic(item)));
+const webPlugins=['web','web-search-deepseek','web-deepseek-api','web-fetch-http'];
 function readLayer(file){
  let text;try{text=readFileSync(file,'utf8');}catch(error){if(error.code==='ENOENT')return new Map();fail('无法读取本机 DSH 模型配置，请检查文件权限');}
  const doc=parseDocument(text,{logLevel:'silent'});if(doc.errors.length)fail('本机 DSH 配置格式有误，请在 DSH 中检查模型设置');
  const rows=new Map();
  function visit(seq){if(!isSeq(seq))return;for(const row of seq.items){if(!isMap(row))continue;
   const id=row.get('id'),name=row.get('name');
-  const key=['agent-default-model','llm-pi-ai','llm-deepseek'].includes(id)?id:name==='@deepseek-ai/dsh-agent-default-model'?'agent-default-model':name==='@deepseek-ai/dsh-llm-pi-ai'?'llm-pi-ai':name==='@deepseek-ai/dsh-llm-deepseek'?'llm-deepseek':null;
+  const key=['agent-default-model','llm-pi-ai','llm-deepseek',...webPlugins].includes(id)?id:webPlugins.find(id=>name==='@deepseek-ai/dsh-'+id)|| (name==='@deepseek-ai/dsh-agent-default-model'?'agent-default-model':name==='@deepseek-ai/dsh-llm-pi-ai'?'llm-pi-ai':name==='@deepseek-ai/dsh-llm-deepseek'?'llm-deepseek':null);
   if(key)rows.set(key,{node:row.get('config',true),disabled:row.get('disabled')===true});
   visit(row.get('insert',true));
  }}visit(doc.contents);return rows;
@@ -44,6 +45,11 @@ function selection(value){
  if(!value)return null;
  if(typeof value.provider!=='string'||!value.provider.trim()||typeof value.model!=='string'||!value.model.trim())fail('DSH 默认模型缺少 provider 或 model');
  return {provider:value.provider,model:value.model,...typeof value.reasoningEffort==='string'?{reasoningEffort:value.reasoningEffort}:{}};
+}
+export function resolveDshWeb({home=process.env.DSH_HOME||join(homedir(),'.dsh')}={}){
+ const layers=['cordis.patch.yml','profiles/headless/cordis.patch.yml','profiles/desktop/cordis.patch.yml'].map(path=>readLayer(join(home,path))),patches=[];
+ for(const id of webPlugins){const row=layers.map(layer=>layer.get(id)).find(Boolean);if(row)patches.push({id,disabled:!!row.disabled,...row.node&&!row.disabled?{config:config(row)}:{}});}
+ return patches;
 }
 export function resolveDshModel(route,{home=process.env.DSH_HOME||join(homedir(),'.dsh')}={}){
  // Read only model declarations. Never boot/copy Desktop plugins or read credentials.

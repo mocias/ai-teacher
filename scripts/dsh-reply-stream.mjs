@@ -42,10 +42,11 @@ export function replyProjector(emit,{delay=40}={}){
   block.raw+=chunk.argumentsDelta;if(block.name!==toolName)return;if(chosen!==null&&chosen!==chunk.index)return;chosen=chunk.index;
   const prefix=replyPrefix(block.raw);if(prefix===null||prefix.length>20000)return;pending=prefix;if(!timer){timer=setTimeout(flush,delay);timer.unref?.();}
  }
- return {handle,dispose(){flush();clear();}};
+ return {handle,begin(agent){if(!agent?.id||agent.session?.header?.origin==='subagent')return;clear();owner=agent.id;attempt=undefined;sequence=0;},dispose(){flush();clear();}};
 }
 export function apply(ctx){
  const projector=replyProjector(event=>process.stdout.write(JSON.stringify(event)+'\n'));
+ ctx.on('agent/inbox/claimed',({agent})=>projector.begin(agent));
  ctx.on('agent/assistant-stream',projector.handle);
  ctx.effect(()=>()=>projector.dispose());
 }

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AI Teacher Local API",
-    "version": "0.14.1",
+    "version": "0.18.0",
     "description": "仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。"
   },
   "servers": [
@@ -24,412 +24,6 @@
     }
   },
   "paths": {
-    "/api/calendar": {
-      "post": {
-        "summary": "添加或编辑学习日程",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "time": {
-                    "type": "string"
-                  },
-                  "session_id": {
-                    "type": "string"
-                  },
-                  "duration": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1440,
-                    "description": "预计时长，单位分钟，默认30"
-                  }
-                },
-                "required": [
-                  "title",
-                  "date"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "日程已保存"
-          },
-          "400": {
-            "description": "参数无效"
-          },
-          "401": {
-            "description": "缺少Web会话"
-          },
-          "403": {
-            "description": "不允许Agent操作"
-          }
-        }
-      }
-    },
-    "/api/calendar/done": {
-      "post": {
-        "summary": "标记日程待办完成（不更新学习证据）",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "done": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "id",
-                  "done"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "日程已保存"
-          },
-          "400": {
-            "description": "参数无效"
-          },
-          "401": {
-            "description": "缺少Web会话"
-          },
-          "403": {
-            "description": "不允许Agent操作"
-          }
-        }
-      }
-    },
-    "/api/discussions": {
-      "post": {
-        "summary": "开始独立的目标讨论",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "request_id": {
-                    "type": "string",
-                    "maxLength": 100
-                  }
-                },
-                "required": [
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "操作成功"
-          },
-          "401": {
-            "description": "缺少 Web 会话"
-          },
-          "403": {
-            "description": "Agent 不可执行用户确认"
-          },
-          "409": {
-            "description": "版本冲突、已确认或任务仍在处理"
-          }
-        }
-      }
-    },
-    "/api/discussions/draft": {
-      "post": {
-        "summary": "自动保存手动修改的草案字段",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "conversation_id": {
-                    "type": "string"
-                  },
-                  "revision": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "draft": {
-                    "type": "object",
-                    "properties": {
-                      "direction": {
-                        "type": "string",
-                        "maxLength": 150
-                      },
-                      "background": {
-                        "type": "string",
-                        "maxLength": 1000
-                      },
-                      "level": {
-                        "type": "string",
-                        "maxLength": 1000
-                      },
-                      "outcome": {
-                        "type": "string",
-                        "maxLength": 1000
-                      },
-                      "exclusions": {
-                        "type": "string",
-                        "maxLength": 1000
-                      }
-                    }
-                  }
-                },
-                "required": [
-                  "conversation_id",
-                  "revision",
-                  "draft"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "操作成功"
-          },
-          "401": {
-            "description": "缺少 Web 会话"
-          },
-          "403": {
-            "description": "Agent 不可执行用户确认"
-          },
-          "409": {
-            "description": "版本冲突、已确认或任务仍在处理"
-          }
-        }
-      }
-    },
-    "/api/discussions/input": {
-      "post": {
-        "summary": "保存未发送文字",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "conversation_id": {
-                    "type": "string"
-                  },
-                  "content": {
-                    "type": "string",
-                    "maxLength": 20000
-                  }
-                },
-                "required": [
-                  "conversation_id",
-                  "content"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "操作成功"
-          },
-          "401": {
-            "description": "缺少 Web 会话"
-          },
-          "403": {
-            "description": "Agent 不可执行用户确认"
-          },
-          "409": {
-            "description": "版本冲突、已确认或任务仍在处理"
-          }
-        }
-      }
-    },
-    "/api/discussions/suggestion": {
-      "post": {
-        "summary": "接受或拒绝 AI 对手动字段的修改建议",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "conversation_id": {
-                    "type": "string"
-                  },
-                  "revision": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "accept": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "conversation_id",
-                  "revision",
-                  "accept"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "操作成功"
-          },
-          "401": {
-            "description": "缺少 Web 会话"
-          },
-          "403": {
-            "description": "Agent 不可执行用户确认"
-          },
-          "409": {
-            "description": "版本冲突、已确认或任务仍在处理"
-          }
-        }
-      }
-    },
-    "/api/discussions/confirm": {
-      "post": {
-        "summary": "用户确认草案并创建目标（重复确认返回同一目标）",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "conversation_id": {
-                    "type": "string"
-                  },
-                  "revision": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "maxLength": 100
-                  }
-                },
-                "required": [
-                  "conversation_id",
-                  "revision",
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "操作成功"
-          },
-          "401": {
-            "description": "缺少 Web 会话"
-          },
-          "403": {
-            "description": "Agent 不可执行用户确认"
-          },
-          "409": {
-            "description": "版本冲突、已确认或任务仍在处理"
-          }
-        }
-      }
-    },
-    "/api/resource-file": {
-      "get": {
-        "summary": "下载已保存的本地原文件",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "原始文件，以附件下载"
-          },
-          "401": {
-            "description": "缺少 Web 会话"
-          },
-          "404": {
-            "description": "文件不存在"
-          }
-        }
-      }
-    },
     "/api/host/settings": {
       "post": {
         "summary": "配置 Codex 自动唤醒",
@@ -886,7 +480,7 @@
     },
     "/api/material-content": {
       "post": {
-        "summary": "保存不可变的资料正文与范围",
+        "summary": "保存不可变的资料正文与该目标的约定范围",
         "security": [
           {
             "UserSession": []
@@ -900,6 +494,9 @@
                 "type": "object",
                 "properties": {
                   "resource_id": {
+                    "type": "string"
+                  },
+                  "goal_id": {
                     "type": "string"
                   },
                   "scope": {
@@ -951,6 +548,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "goal_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "资料已与目标关联时传入当前目标 ID。"
           }
         ],
         "responses": {
@@ -1542,9 +1147,58 @@
         }
       }
     },
+    "/api/sessions/learning": {
+      "post": {
+        "summary": "进入已确认任务的独立学习对话，重复进入复用记录",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session_id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "身份凭据缺失"
+          },
+          "403": {
+            "description": "调用身份不允许"
+          },
+          "409": {
+            "description": "状态冲突"
+          }
+        }
+      }
+    },
     "/api/messages": {
       "post": {
-        "summary": "保存用户消息并排队",
+        "summary": "保存文字消息或点击选择题答案并排队",
         "security": [
           {
             "UserSession": []
@@ -1563,8 +1217,39 @@
                   "content": {
                     "type": "string"
                   },
+                  "choice_answer": {
+                    "type": "object",
+                    "properties": {
+                      "question_message_id": {
+                        "type": "string"
+                      },
+                      "option_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "question_message_id",
+                      "option_ids"
+                    ],
+                    "additionalProperties": false
+                  },
                   "request_id": {
                     "type": "string"
+                  },
+                  "attachment_resource_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "uniqueItems": true,
+                    "description": "普通对话的已保存文件引用，总大小不超过20MiB；正式考察不接受附件。"
                   },
                   "task_kind": {
                     "enum": [
@@ -1579,12 +1264,33 @@
                   },
                   "content_id": {
                     "type": "string"
+                  },
+                  "learning_intent": {
+                    "enum": [
+                      "NOTE_VERIFICATION",
+                      "KNOWLEDGE_PROFILE",
+                      "TOPIC_REORGANIZATION"
+                    ]
+                  },
+                  "subject_id": {
+                    "type": "string"
                   }
                 },
                 "required": [
                   "conversation_id",
-                  "content",
                   "request_id"
+                ],
+                "anyOf": [
+                  {
+                    "required": [
+                      "content"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "choice_answer"
+                    ]
+                  }
                 ]
               }
             }
@@ -1659,6 +1365,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "description": "可选幂等上传标识，用于响应丢失后的安全重试"
+                  },
                   "goal_id": {
                     "type": "string"
                   },
@@ -1678,6 +1388,9 @@
                   },
                   "saved": {
                     "type": "boolean"
+                  },
+                  "scope": {
+                    "type": "string"
                   },
                   "file": {
                     "type": "object",
@@ -2178,17 +1891,663 @@
                     "type": "object",
                     "properties": {
                       "name": {
+                        "const": "teacher_advance_learning_plan"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "lease_token": {
+                            "type": "string"
+                          },
+                          "request_id": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "START",
+                              "LATER",
+                              "STOP",
+                              "RESUME",
+                              "REVISE"
+                            ]
+                          },
+                          "expected_revision": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "proposal_id": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "feedback": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4000
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_get_agent_configuration"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "lease_token": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_set_agent_configuration"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "lease_token": {
+                            "type": "string"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "summary": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 3000
+                          },
+                          "routes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "role": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "API",
+                                    "MCP",
+                                    "UNCONFIGURED"
+                                  ]
+                                },
+                                "harness": {
+                                  "type": "string",
+                                  "enum": [
+                                    "MANUAL",
+                                    "CODEX",
+                                    "CLAUDE",
+                                    "DSH"
+                                  ]
+                                },
+                                "model": {
+                                  "type": "string",
+                                  "maxLength": 150
+                                },
+                                "profile_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "role",
+                                "mode"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1,
+                            "maxItems": 10
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "revision",
+                          "summary",
+                          "routes",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_agent_configuration"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string"
+                          },
+                          "lease_token": {
+                            "type": "string"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "summary": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 3000
+                          },
+                          "plan": {
+                            "type": "object",
+                            "properties": {
+                              "routes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string"
+                                    },
+                                    "mode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "API",
+                                        "MCP",
+                                        "UNCONFIGURED"
+                                      ]
+                                    },
+                                    "harness": {
+                                      "type": "string",
+                                      "enum": [
+                                        "MANUAL",
+                                        "CODEX",
+                                        "CLAUDE",
+                                        "DSH"
+                                      ]
+                                    },
+                                    "model": {
+                                      "type": "string",
+                                      "maxLength": 150
+                                    },
+                                    "profile_id": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "connection": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "model": {
+                                          "type": "string"
+                                        },
+                                        "base_url": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "model",
+                                        "base_url"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "role",
+                                    "mode"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "maxItems": 10
+                              }
+                            },
+                            "required": [
+                              "routes"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "revision",
+                          "summary",
+                          "plan",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_profile"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "string"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 10000
+                          },
+                          "reason": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "conversation_id",
+                          "revision",
+                          "content",
+                          "reason",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_review_changes"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "string"
+                          },
+                          "significant": {
+                            "type": "boolean"
+                          },
+                          "question": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "reason": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "conversation_id",
+                          "significant",
+                          "question",
+                          "reason",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_record_reason"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "conversation_id",
+                          "reason",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_goal_draft"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "conversation_id": {
+                            "type": "string"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "draft": {
+                            "type": "object",
+                            "properties": {
+                              "direction": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 150
+                              },
+                              "background": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "level": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "outcome": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "exclusions": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              }
+                            },
+                            "required": [
+                              "direction",
+                              "background",
+                              "level",
+                              "outcome",
+                              "exclusions"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "summary": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "request_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "conversation_id",
+                          "revision",
+                          "draft",
+                          "summary",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_knowledge_profile"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "goal_id": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "node_id": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 5000
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 3000
+                          },
+                          "source_judgment_ids": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/properties/job_id"
+                            },
+                            "minItems": 1
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/job_id"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "goal_id",
+                          "node_id",
+                          "content",
+                          "reason",
+                          "source_judgment_ids"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_propose_topic_reorganization"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "goal_id": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "topic_id": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "SPLIT",
+                              "MERGE"
+                            ]
+                          },
+                          "partitions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "$ref": "#/properties/job_id"
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "default": ""
+                                },
+                                "node_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/properties/job_id"
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "node_ids"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "target_topic_id": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 3000
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/job_id"
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "goal_id",
+                          "topic_id",
+                          "kind",
+                          "reason"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
                         "const": "teacher_propose_capabilities"
                       },
                       "arguments": {
                         "type": "object",
                         "properties": {
-                          "goal_id": {
+                          "job_id": {
                             "type": "string",
                             "minLength": 1
                           },
+                          "lease_token": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "goal_id": {
+                            "$ref": "#/properties/job_id"
+                          },
                           "request_id": {
-                            "$ref": "#/properties/goal_id"
+                            "$ref": "#/properties/job_id"
                           },
                           "items": {
                             "type": "array",
@@ -2196,7 +2555,7 @@
                               "type": "object",
                               "properties": {
                                 "title": {
-                                  "$ref": "#/properties/goal_id"
+                                  "$ref": "#/properties/job_id"
                                 },
                                 "kind": {
                                   "type": "string",
@@ -2211,10 +2570,16 @@
                                     "type": "object",
                                     "properties": {
                                       "node": {
-                                        "$ref": "#/properties/goal_id"
+                                        "$ref": "#/properties/job_id"
                                       },
                                       "description": {
-                                        "$ref": "#/properties/goal_id"
+                                        "$ref": "#/properties/job_id"
+                                      },
+                                      "node_id": {
+                                        "$ref": "#/properties/job_id"
+                                      },
+                                      "topic_id": {
+                                        "$ref": "#/properties/job_id"
                                       }
                                     },
                                     "required": [
@@ -2262,6 +2627,15 @@
                           "content_id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "goal_id": {
+                            "$ref": "#/properties/content_id"
+                          },
+                          "job_id": {
+                            "$ref": "#/properties/content_id"
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/content_id"
                           }
                         },
                         "required": [
@@ -2288,6 +2662,15 @@
                           "content_id": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "goal_id": {
+                            "$ref": "#/properties/content_id"
+                          },
+                          "job_id": {
+                            "$ref": "#/properties/content_id"
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/content_id"
                           },
                           "status": {
                             "type": "string",
@@ -2322,23 +2705,131 @@
                     "type": "object",
                     "properties": {
                       "name": {
+                        "const": "teacher_record_material_map"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "content_id": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "coverage": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "requirement_id": {
+                                  "$ref": "#/properties/job_id"
+                                },
+                                "coverage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "COVERED",
+                                    "PARTIAL",
+                                    "NOT_COVERED",
+                                    "UNCLEAR"
+                                  ]
+                                },
+                                "rationale": {
+                                  "type": "string",
+                                  "maxLength": 2000,
+                                  "default": ""
+                                }
+                              },
+                              "required": [
+                                "requirement_id",
+                                "coverage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "conflicts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "description": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 3000
+                                },
+                                "requirement_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/properties/job_id"
+                                  },
+                                  "minItems": 1
+                                },
+                                "important": {
+                                  "type": "boolean"
+                                },
+                                "source_content_ids": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/properties/job_id"
+                                  },
+                                  "default": []
+                                }
+                              },
+                              "required": [
+                                "description",
+                                "requirement_ids",
+                                "important"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "job_id",
+                          "lease_token",
+                          "content_id",
+                          "coverage",
+                          "conflicts"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
                         "const": "teacher_plan_learning"
                       },
                       "arguments": {
                         "type": "object",
                         "properties": {
-                          "goal_id": {
+                          "job_id": {
                             "type": "string",
                             "minLength": 1
                           },
+                          "lease_token": {
+                            "$ref": "#/properties/job_id"
+                          },
+                          "goal_id": {
+                            "$ref": "#/properties/job_id"
+                          },
                           "title": {
-                            "$ref": "#/properties/goal_id"
+                            "$ref": "#/properties/job_id"
                           },
                           "summary": {
-                            "$ref": "#/properties/goal_id"
+                            "$ref": "#/properties/job_id"
                           },
                           "request_id": {
-                            "$ref": "#/properties/goal_id"
+                            "$ref": "#/properties/job_id"
                           },
                           "phases": {
                             "type": "array",
@@ -2346,7 +2837,7 @@
                               "type": "object",
                               "properties": {
                                 "title": {
-                                  "$ref": "#/properties/goal_id"
+                                  "$ref": "#/properties/job_id"
                                 },
                                 "topics": {
                                   "type": "array",
@@ -2354,26 +2845,63 @@
                                     "type": "object",
                                     "properties": {
                                       "key": {
-                                        "$ref": "#/properties/goal_id"
+                                        "$ref": "#/properties/job_id"
                                       },
                                       "title": {
-                                        "$ref": "#/properties/goal_id"
+                                        "$ref": "#/properties/job_id"
                                       },
                                       "requirement_ids": {
                                         "type": "array",
                                         "items": {
-                                          "$ref": "#/properties/goal_id"
+                                          "$ref": "#/properties/job_id"
                                         },
                                         "minItems": 1
                                       },
                                       "resource_ids": {
                                         "type": "array",
                                         "items": {
-                                          "$ref": "#/properties/goal_id"
+                                          "$ref": "#/properties/job_id"
                                         }
                                       },
                                       "dependencies": {
                                         "$ref": "#/properties/phases/items/properties/topics/items/properties/resource_ids"
+                                      },
+                                      "prior_learning": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "requirement_id": {
+                                              "$ref": "#/properties/job_id"
+                                            },
+                                            "source_requirement_id": {
+                                              "$ref": "#/properties/job_id"
+                                            },
+                                            "evidence_id": {
+                                              "$ref": "#/properties/job_id"
+                                            },
+                                            "action": {
+                                              "type": "string",
+                                              "enum": [
+                                                "BUILD_ON",
+                                                "VERIFY_FIRST"
+                                              ]
+                                            },
+                                            "reason": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 1200
+                                            }
+                                          },
+                                          "required": [
+                                            "requirement_id",
+                                            "source_requirement_id",
+                                            "evidence_id",
+                                            "action",
+                                            "reason"
+                                          ],
+                                          "additionalProperties": false
+                                        }
                                       },
                                       "sessions": {
                                         "type": "array",
@@ -2381,10 +2909,10 @@
                                           "type": "object",
                                           "properties": {
                                             "title": {
-                                              "$ref": "#/properties/goal_id"
+                                              "$ref": "#/properties/job_id"
                                             },
                                             "objective": {
-                                              "$ref": "#/properties/goal_id"
+                                              "$ref": "#/properties/job_id"
                                             }
                                           },
                                           "required": [
@@ -2456,12 +2984,60 @@
                           "question": {
                             "$ref": "#/properties/assessment_id"
                           },
+                          "choice": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "SINGLE",
+                                  "MULTIPLE"
+                                ]
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,32}$"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "minItems": 2,
+                                "maxItems": 8
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "options"
+                            ],
+                            "additionalProperties": false
+                          },
                           "requirement_ids": {
                             "type": "array",
                             "items": {
                               "$ref": "#/properties/assessment_id"
                             },
                             "minItems": 1
+                          },
+                          "phase": {
+                            "type": "string",
+                            "enum": [
+                              "BROAD",
+                              "FOCUSED"
+                            ]
                           },
                           "request_id": {
                             "$ref": "#/properties/assessment_id"
@@ -2500,6 +3076,12 @@
                           "feedback": {
                             "$ref": "#/properties/round_id"
                           },
+                          "job_id": {
+                            "$ref": "#/properties/round_id"
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/round_id"
+                          },
                           "request_id": {
                             "$ref": "#/properties/round_id"
                           }
@@ -2508,6 +3090,100 @@
                           "round_id",
                           "feedback",
                           "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_assessment_explanation"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "round_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "content": {
+                            "$ref": "#/properties/round_id"
+                          },
+                          "job_id": {
+                            "$ref": "#/properties/round_id"
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/round_id"
+                          },
+                          "request_id": {
+                            "$ref": "#/properties/round_id"
+                          }
+                        },
+                        "required": [
+                          "round_id",
+                          "content",
+                          "job_id",
+                          "lease_token",
+                          "request_id"
+                        ],
+                        "additionalProperties": false,
+                        "$schema": "http://json-schema.org/draft-07/schema#"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "arguments"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "const": "teacher_suggest_note_verification"
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "properties": {
+                          "goal_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "job_id": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "lease_token": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "note_id": {
+                            "$ref": "#/properties/goal_id"
+                          },
+                          "requirement_ids": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/properties/goal_id"
+                            },
+                            "minItems": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": [
+                          "goal_id",
+                          "job_id",
+                          "lease_token",
+                          "note_id",
+                          "requirement_ids",
+                          "reason"
                         ],
                         "additionalProperties": false,
                         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -2563,6 +3239,30 @@
                               ],
                               "additionalProperties": false
                             }
+                          },
+                          "node_judgments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "requirement_id": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "judgment": {
+                                  "$ref": "#/properties/assessment_id"
+                                },
+                                "change_reason": {
+                                  "$ref": "#/properties/assessment_id"
+                                }
+                              },
+                              "required": [
+                                "requirement_id",
+                                "judgment",
+                                "change_reason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
                           },
                           "gaps": {
                             "type": "array",
@@ -2812,6 +3512,47 @@
                             "minLength": 1,
                             "maxLength": 20000
                           },
+                          "choice": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "SINGLE",
+                                  "MULTIPLE"
+                                ]
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,32}$"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "minItems": 2,
+                                "maxItems": 8
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "options"
+                            ],
+                            "additionalProperties": false
+                          },
                           "request_id": {
                             "type": "string"
                           }
@@ -2987,6 +3728,2830 @@
           },
           "202": {
             "description": "Notification accepted"
+          }
+        }
+      }
+    },
+    "/api/prior-learning": {
+      "get": {
+        "summary": "读取当前目标已确认要求所匹配的其他目标作答节选，每项要求每种证据关系最多三条，保留来源考察与知识点。",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "goal_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/recovery-options": {
+      "post": {
+        "summary": "List unfinished calendar entries before the browser-local as_of date with eligibility reasons. Does not modify data.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "as_of": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "as_of"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/recovery-preview": {
+      "post": {
+        "summary": "Preview rescheduling selected overdue tasks. Respect prerequisites, existing daily load and weekdays. Preserve identifiers, progress and notes. Returns input, fingerprint, entries, total_minutes and days.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "as_of": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  },
+                  "entry_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "as_of",
+                  "start_date",
+                  "daily_minutes",
+                  "weekdays",
+                  "entry_ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/recovery-commit": {
+      "post": {
+        "summary": "Atomically commit unchanged recovery preview. Reject stale calendar or learning state. Idempotent with request_id. Changes only dates and within-day positions.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "as_of": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  },
+                  "entry_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "as_of",
+                  "start_date",
+                  "daily_minutes",
+                  "weekdays",
+                  "entry_ids",
+                  "fingerprint",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/remediation/schedule": {
+      "post": {
+        "summary": "Schedule a calendar task for a current unresolved gap in an active goal. Preserve the original gap description, reason, evidence and selected goal resources. Reuse pending work without changing its content or progress; never resolve a gap from study progress. Returns id, date and reused.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gap_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240
+                  },
+                  "activity": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "resource_ids": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "gap_id",
+                  "date",
+                  "duration",
+                  "activity",
+                  "resource_ids",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/reviews/followup": {
+      "post": {
+        "summary": "Schedule a review from completed assessment evidence and the current accepted requirements. Reuses a compatible pending review without changing its date or provenance. Atomic and idempotent; returns id, reused and due_date.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source_assessment_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "requirement_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "source_assessment_id",
+                  "requirement_id",
+                  "due_date",
+                  "reason",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/reviews/cancel": {
+      "post": {
+        "summary": "Cancel a pending review while preserving provenance and unresolved gaps. In-progress or completed reviews cannot be cancelled. Atomic and idempotent.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/resources/goal": {
+      "post": {
+        "summary": "Attach one resource to an existing or new goal with a goal-specific role and reading scope; preserve the original attachment, text and reading history",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resource_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "enum": [
+                      "PRIMARY",
+                      "SUPPLEMENTARY",
+                      "REFERENCE"
+                    ]
+                  },
+                  "scope": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "content_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "body_content": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "supplement_required": {
+                    "type": "boolean"
+                  },
+                  "supplement_requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "goal_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "goal": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150
+                      },
+                      "domain": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "scope": {
+                        "type": "string",
+                        "maxLength": 5000
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "domain"
+                    ]
+                  }
+                },
+                "required": [
+                  "resource_id",
+                  "role",
+                  "request_id"
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "goal_id"
+                    ],
+                    "not": {
+                      "required": [
+                        "goal"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "goal"
+                    ],
+                    "not": {
+                      "required": [
+                        "goal_id"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/preview": {
+      "post": {
+        "summary": "Preview unscheduled learning tasks without writes; respect dependency order, weekdays and existing calendar duration. Returns input, fingerprint, entries, skipped and total_minutes.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "session_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "start_date",
+                  "daily_minutes",
+                  "session_minutes",
+                  "weekdays"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/calendar/batch": {
+      "post": {
+        "summary": "Commit an unchanged preview atomically and idempotently. Provide the same settings and fingerprint from preview; a stale preview returns 409.",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "daily_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720
+                  },
+                  "session_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6
+                    },
+                    "description": "0=Sunday, 6=Saturday"
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "start_date",
+                  "daily_minutes",
+                  "session_minutes",
+                  "weekdays",
+                  "fingerprint",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Browser session required"
+          },
+          "403": {
+            "description": "Agent credentials cannot perform user actions"
+          },
+          "409": {
+            "description": "State conflict; refresh and preview again"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/start": {
+      "post": {
+        "summary": "从指定目标对话开始整理正式学习路线",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/control": {
+      "post": {
+        "summary": "暂缓、停止或继续该对话的路线整理",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "enum": [
+                      "LATER",
+                      "STOP",
+                      "RESUME"
+                    ]
+                  },
+                  "expected_revision": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "action",
+                  "expected_revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/diagnostic": {
+      "post": {
+        "summary": "从当前规划对话开始或继续本版正式初诊",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "capability_set_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "capability_set_id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/decide": {
+      "post": {
+        "summary": "审阅这一规划对话中仍有效的指定提案",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "proposal_id": {
+                    "type": "string"
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "proposal_id",
+                  "accept",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/revise": {
+      "post": {
+        "summary": "根据学习者的修改意见重新整理指定提案",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "proposal_id": {
+                    "type": "string"
+                  },
+                  "feedback": {
+                    "type": "string"
+                  },
+                  "expected_revision": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "proposal_id",
+                  "feedback",
+                  "expected_revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/rework": {
+      "post": {
+        "summary": "按学习者明确要求重新整理未产生提案的任务",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "expected_revision": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "job_id",
+                  "expected_revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/planning-flow/retry": {
+      "post": {
+        "summary": "明确重试当前规划流程受阻的指定任务",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "job_id": {
+                    "type": "string"
+                  },
+                  "expected_revision": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conversation_id",
+                  "job_id",
+                  "expected_revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/weekly-study": {
+      "get": {
+        "summary": "按本地自然周查看各领域与全局的计划、复习和作答证据",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tz_offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/adaptive-review/settings": {
+      "post": {
+        "summary": "设置整体复习强度，可启用按后续作答自动安排复习",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "intensity": {
+                    "enum": [
+                      "LIGHT",
+                      "STANDARD",
+                      "INTENSIVE"
+                    ]
+                  },
+                  "auto_enabled": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "intensity",
+                  "auto_enabled",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/adaptive-review/accept": {
+      "post": {
+        "summary": "采用有实际作答依据的复习建议",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "source_assessment_id": {
+                    "type": "string"
+                  },
+                  "requirement_id": {
+                    "type": "string"
+                  },
+                  "due_date": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "source_assessment_id",
+                  "requirement_id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/week-plan/settings": {
+      "get": {
+        "summary": "读取自然周学习容量、工作日和领域优先次序",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      },
+      "post": {
+        "summary": "保存周排期设置",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "daily_minutes": {
+                    "type": "integer"
+                  },
+                  "session_minutes": {
+                    "type": "integer"
+                  },
+                  "review_minutes": {
+                    "type": "integer"
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "domain_priority": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/week-plan/preview": {
+      "post": {
+        "summary": "按已有日程、复习容量、领域优先级预览本周日期与理由",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "daily_minutes": {
+                    "type": "integer"
+                  },
+                  "session_minutes": {
+                    "type": "integer"
+                  },
+                  "review_minutes": {
+                    "type": "integer"
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "domain_priority": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "tz_offset": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "start_date"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/week-plan/commit": {
+      "post": {
+        "summary": "原子采纳未过期的周排期预览，保留既有日程及复习",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "daily_minutes": {
+                    "type": "integer"
+                  },
+                  "session_minutes": {
+                    "type": "integer"
+                  },
+                  "review_minutes": {
+                    "type": "integer"
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "domain_priority": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "start_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "tz_offset": {
+                    "type": "integer"
+                  },
+                  "fingerprint": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "start_date",
+                  "fingerprint",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/rolling-plan/settings": {
+      "post": {
+        "summary": "设置全局近期数、领域覆盖数与目标优先级",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "global_limit": {
+                    "type": "integer"
+                  },
+                  "domain_limits": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    }
+                  },
+                  "goal_order": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "revision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/rolling-plan/defer": {
+      "post": {
+        "summary": "延后近期学习任务，保留原任务与学习记录",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/rolling-plan/remove": {
+      "post": {
+        "summary": "从未来安排中移除单个任务",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/rolling-plan/restore": {
+      "post": {
+        "summary": "恢复先前延后或移除的任务",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/rolling-plan/exclude-topic": {
+      "post": {
+        "summary": "排除主题，保留历史与原路线记录",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "proposal_id": {
+                    "type": "string"
+                  },
+                  "topic_key": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "proposal_id",
+                  "topic_key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/rolling-plan/restore-topic": {
+      "post": {
+        "summary": "恢复排除的路线主题",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "proposal_id": {
+                    "type": "string"
+                  },
+                  "topic_key": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "proposal_id",
+                  "topic_key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/material-map/resolve": {
+      "post": {
+        "summary": "采用一份来源正文或说明两份材料不构成冲突，保存理由及裁决历史",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal_id": {
+                    "type": "string"
+                  },
+                  "conflict_id": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "enum": [
+                      "ADOPTED",
+                      "NO_CONFLICT"
+                    ]
+                  },
+                  "source_content_id": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal_id",
+                  "conflict_id",
+                  "decision",
+                  "note",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/notes/verification/start": {
+      "post": {
+        "summary": "用户同意为当前版本笔记启动验证",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "invite_id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invite_id",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/notes/verification/defer": {
+      "post": {
+        "summary": "暂缓本版本的可选验证邀请",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "invite_id": {
+                    "type": "string"
+                  },
+                  "days": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "invite_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/notes/verification/decline": {
+      "post": {
+        "summary": "忽略本版本笔记验证邀请",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "invite_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "invite_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/open-book/search": {
+      "post": {
+        "summary": "开卷考察中检索用户输入的词，返回原文片段和来源",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assessment_id": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "enum": [
+                      "CURRENT",
+                      "ALL"
+                    ]
+                  },
+                  "query": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "assessment_id",
+                  "query"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/open-book/read": {
+      "post": {
+        "summary": "读取开卷考察授权范围内的笔记或资料快照",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assessment_id": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "enum": [
+                      "CURRENT",
+                      "ALL"
+                    ]
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "enum": [
+                      "note",
+                      "material"
+                    ]
+                  }
+                },
+                "required": [
+                  "assessment_id",
+                  "id",
+                  "type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/open-book/save-draft": {
+      "post": {
+        "summary": "明确保存用户草稿并关联来源考察",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assessment_id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "pending_draft": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "assessment_id",
+                  "title",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/knowledge-profile": {
+      "get": {
+        "summary": "读取长期画像；显式请求完整视图可回查原回答",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "full",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/knowledge-profile/topic-decide": {
+      "post": {
+        "summary": "采纳或拒绝主题拆分或合并提案，保留历史归属",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "proposal_id": {
+                    "type": "string"
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "proposal_id",
+                  "accept",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/knowledge-profile/topics": {
+      "post": {
+        "summary": "创建领域内的知识主题",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domain": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "domain",
+                  "name",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/knowledge-profile/node-topic": {
+      "post": {
+        "summary": "将现有知识点归入本领域主题并记录原因",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "node_id": {
+                    "type": "string"
+                  },
+                  "topic_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "node_id",
+                  "topic_id",
+                  "reason",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/knowledge-profile/decide": {
+      "post": {
+        "summary": "用户采纳或拒绝有依据的知识画像整理提案",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "proposal_id": {
+                    "type": "string"
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "proposal_id",
+                  "accept",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作结果"
+          },
+          "400": {
+            "description": "请求无效"
+          },
+          "401": {
+            "description": "需要工作台用户会话"
+          },
+          "409": {
+            "description": "状态已变化或不符合该操作的条件"
+          }
+        }
+      }
+    },
+    "/api/calendar": {
+      "post": {
+        "summary": "添加或编辑学习日程",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "time": {
+                    "type": "string"
+                  },
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440,
+                    "description": "预计时长，单位分钟，默认30"
+                  }
+                },
+                "required": [
+                  "title",
+                  "date"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
+    "/api/calendar/done": {
+      "post": {
+        "summary": "标记日程待办完成（不更新学习证据）",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "done": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "done"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "日程已保存"
+          },
+          "400": {
+            "description": "参数无效"
+          },
+          "401": {
+            "description": "缺少Web会话"
+          },
+          "403": {
+            "description": "不允许Agent操作"
+          }
+        }
+      }
+    },
+    "/api/discussions": {
+      "post": {
+        "summary": "开始独立的目标讨论",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/draft": {
+      "post": {
+        "summary": "自动保存手动修改的草案字段",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "draft": {
+                    "type": "object",
+                    "properties": {
+                      "direction": {
+                        "type": "string",
+                        "maxLength": 150
+                      },
+                      "background": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "level": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "exclusions": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "revision",
+                  "draft"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/input": {
+      "post": {
+        "summary": "保存未发送文字",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 20000
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/suggestion": {
+      "post": {
+        "summary": "接受或拒绝 AI 对手动字段的修改建议",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "accept": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "revision",
+                  "accept"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/discussions/confirm": {
+      "post": {
+        "summary": "用户确认草案并创建目标（重复确认返回同一目标）",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "revision",
+                  "request_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "操作成功"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "403": {
+            "description": "Agent 不可执行用户确认"
+          },
+          "409": {
+            "description": "版本冲突、已确认或任务仍在处理"
+          }
+        }
+      }
+    },
+    "/api/resource-file": {
+      "get": {
+        "summary": "下载已保存的本地原文件",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "原始文件，以附件下载"
+          },
+          "401": {
+            "description": "缺少 Web 会话"
+          },
+          "404": {
+            "description": "文件不存在"
           }
         }
       }
@@ -4001,681 +7566,6 @@
         }
       }
     },
-    "/api/resources/goal": {
-      "post": {
-        "summary": "Associate an unassigned resource with an existing goal or create a goal atomically; preserve attachment, text, reading and notes",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "resource_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "role": {
-                    "enum": [
-                      "PRIMARY",
-                      "SUPPLEMENTARY",
-                      "REFERENCE"
-                    ]
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "goal_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "goal": {
-                    "type": "object",
-                    "properties": {
-                      "title": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 150
-                      },
-                      "domain": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100
-                      },
-                      "scope": {
-                        "type": "string",
-                        "maxLength": 5000
-                      }
-                    },
-                    "required": [
-                      "title",
-                      "domain"
-                    ]
-                  }
-                },
-                "required": [
-                  "resource_id",
-                  "role",
-                  "request_id"
-                ],
-                "oneOf": [
-                  {
-                    "required": [
-                      "goal_id"
-                    ],
-                    "not": {
-                      "required": [
-                        "goal"
-                      ]
-                    }
-                  },
-                  {
-                    "required": [
-                      "goal"
-                    ],
-                    "not": {
-                      "required": [
-                        "goal_id"
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/calendar/preview": {
-      "post": {
-        "summary": "Preview unscheduled learning tasks without writes; respect dependency order, weekdays and existing calendar duration. Returns input, fingerprint, entries, skipped and total_minutes.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "goal_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "start_date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "daily_minutes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 720
-                  },
-                  "session_minutes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 240
-                  },
-                  "weekdays": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 6
-                    },
-                    "description": "0=Sunday, 6=Saturday"
-                  }
-                },
-                "required": [
-                  "goal_id",
-                  "start_date",
-                  "daily_minutes",
-                  "session_minutes",
-                  "weekdays"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/calendar/batch": {
-      "post": {
-        "summary": "Commit an unchanged preview atomically and idempotently. Provide the same settings and fingerprint from preview; a stale preview returns 409.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "goal_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "start_date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "daily_minutes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 720
-                  },
-                  "session_minutes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 240
-                  },
-                  "weekdays": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 6
-                    },
-                    "description": "0=Sunday, 6=Saturday"
-                  },
-                  "fingerprint": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "goal_id",
-                  "start_date",
-                  "daily_minutes",
-                  "session_minutes",
-                  "weekdays",
-                  "fingerprint",
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/reviews/followup": {
-      "post": {
-        "summary": "Schedule a review from completed assessment evidence and the current accepted requirements. Reuses a compatible pending review without changing its date or provenance. Atomic and idempotent; returns id, reused and due_date.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "source_assessment_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "requirement_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "due_date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "reason": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 20000
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "source_assessment_id",
-                  "requirement_id",
-                  "due_date",
-                  "reason",
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/reviews/cancel": {
-      "post": {
-        "summary": "Cancel a pending review while preserving provenance and unresolved gaps. In-progress or completed reviews cannot be cancelled. Atomic and idempotent.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "id",
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/remediation/schedule": {
-      "post": {
-        "summary": "Schedule a calendar task for a current unresolved gap in an active goal. Preserve the original gap description, reason, evidence and selected goal resources. Reuse pending work without changing its content or progress; never resolve a gap from study progress. Returns id, date and reused.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "gap_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "duration": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 240
-                  },
-                  "activity": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 5000
-                  },
-                  "resource_ids": {
-                    "type": "array",
-                    "maxItems": 50,
-                    "items": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "gap_id",
-                  "date",
-                  "duration",
-                  "activity",
-                  "resource_ids",
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/calendar/recovery-options": {
-      "post": {
-        "summary": "List unfinished calendar entries before the browser-local as_of date with eligibility reasons. Does not modify data.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "as_of": {
-                    "type": "string",
-                    "format": "date"
-                  }
-                },
-                "required": [
-                  "as_of"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/calendar/recovery-preview": {
-      "post": {
-        "summary": "Preview rescheduling selected overdue tasks. Respect prerequisites, existing daily load and weekdays. Preserve identifiers, progress and notes. Returns input, fingerprint, entries, total_minutes and days.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "as_of": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "start_date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "daily_minutes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 720
-                  },
-                  "weekdays": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 6
-                    },
-                    "description": "0=Sunday, 6=Saturday"
-                  },
-                  "entry_ids": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 100,
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  }
-                },
-                "required": [
-                  "as_of",
-                  "start_date",
-                  "daily_minutes",
-                  "weekdays",
-                  "entry_ids"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
-    "/api/calendar/recovery-commit": {
-      "post": {
-        "summary": "Atomically commit unchanged recovery preview. Reject stale calendar or learning state. Idempotent with request_id. Changes only dates and within-day positions.",
-        "security": [
-          {
-            "UserSession": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "as_of": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "start_date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "daily_minutes": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 720
-                  },
-                  "weekdays": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 6
-                    },
-                    "description": "0=Sunday, 6=Saturday"
-                  },
-                  "entry_ids": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 100,
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "fingerprint": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "request_id": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "as_of",
-                  "start_date",
-                  "daily_minutes",
-                  "weekdays",
-                  "entry_ids",
-                  "fingerprint",
-                  "request_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "JSON result"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Browser session required"
-          },
-          "403": {
-            "description": "Agent credentials cannot perform user actions"
-          },
-          "409": {
-            "description": "State conflict; refresh and preview again"
-          }
-        }
-      }
-    },
     "/api/reply-streams": {
       "get": {
         "summary": "Read volatile DSH reply previews for reconnect; not saved messages",
@@ -4763,6 +7653,117 @@
           },
           "409": {
             "description": "Unknown conversation or model"
+          }
+        }
+      }
+    },
+    "/api/agents/configuration/undo": {
+      "post": {
+        "summary": "撤销主 Agent 最新且未被后续设置覆盖的直接配置",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "request_id"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "配置已恢复，变更记录保留"
+          },
+          "403": {
+            "description": "仅用户会话可撤销"
+          },
+          "409": {
+            "description": "变更已撤销、配置已变化或功能仍在执行"
+          }
+        }
+      }
+    },
+    "/api/run-progress": {
+      "get": {
+        "summary": "读取当前宿主执行进度快照，不含内部推理或工具结果全文",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "回合阶段与工具状态"
+          },
+          "401": {
+            "description": "需要页面会话"
+          }
+        }
+      }
+    },
+    "/api/agents/dsh-network": {
+      "get": {
+        "summary": "读取本机 DSH 代理设置",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "proxy_url"
+          }
+        }
+      },
+      "post": {
+        "summary": "保存仅用于 DSH 进程的本机代理",
+        "security": [
+          {
+            "UserSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "proxy_url"
+                ],
+                "properties": {
+                  "proxy_url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "已保存，后续进程生效"
+          },
+          "403": {
+            "description": "Agent 凭据不能修改此设置"
           }
         }
       }

@@ -1,6 +1,8 @@
 import {existsSync} from 'node:fs';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {join,dirname,delimiter,isAbsolute,resolve,extname} from 'node:path';
+import {resolveDshWeb} from './dsh-model.mjs';
+import {teacherSearchPatches} from './search-config.mjs';
 
 const fail=message=>{throw Object.assign(new Error(message),{status:409});};
 const cliEntry=root=>join(root,'resources','app.asar','dsh','node_modules','@deepseek-ai','dsh-desktop-host','lib','cli.js');
@@ -34,9 +36,10 @@ export function dshCommand(configured='',{env=process.env,platform=process.platf
 // JSON is valid YAML. Values never become executable !!js expressions.
 // Only the bounded Teacher MCP tools are enabled for these one-shot jobs.
 export const dshDisabledPlugins=['plan-mode','mcp-resources','tool-plugin-manager','tool-working-directory','tool-bash','tool-pwsh','tool-jobs','tool-fs','tool-fs-search','agent-instructions','skill-filesystem','tool-skill','tool-subagent-control','tool-subagent-list-agents','tool-subagent','tool-subagent-fork','tool-subagent-report','tool-workflow','tool-todo','tool-goal','tool-ralph','tool-str-replace-editor','tool-web','session-title-llm','config-editor','settings'];
-export function dshPatch(route,{bridge,node=process.execPath,baseUrl,token,modelConfig,session,sourceHome}){
+export function dshPatch(route,{bridge,node=process.execPath,baseUrl,token,modelConfig,session,sourceHome,webConfig,acp=false}){
  const patch=dshDisabledPlugins.map(id=>({id,disabled:true}));
- patch.push({id:'tools',config:{mode:'native'}},{id:'credentials',disabled:false});
+ patch.push(...teacherSearchPatches(webConfig|| (sourceHome?resolveDshWeb({home:sourceHome}):[])),{id:'tool-web',disabled:false,config:{search:true,fetch:true,searchTimeoutMs:60000,fetchTimeoutMs:30000,searchMaxQueries:3,searchMaxResults:6,fetchMaxOutputChars:60000}});
+ if(!acp)patch.push({id:'tools',config:{mode:'native'}});patch.push({id:'credentials',disabled:false});
  if(session){patch.push({id:'credentials',disabled:false,config:{path:join(sourceHome,'.credentials.yaml'),dshHome:sourceHome,watch:false}},{id:'session-persistence-jsonl',config:{root:session.logs,compression:'none'}});}
  if(modelConfig?.selection){patch.push(...modelConfig.adapterPatches,{id:'agent-default-model',config:modelConfig.selection});}
  else if(route.model){
@@ -46,9 +49,11 @@ export function dshPatch(route,{bridge,node=process.execPath,baseUrl,token,model
  }
  if(modelConfig?.registry){
   patch.push({insert:[{id:'teacher-model-registry',name:pathToFileURL(fileURLToPath(new URL('../scripts/dsh-model-registry.mjs',import.meta.url))).href,config:{mode:'execute',sourceHome,...modelConfig.registry}}]});
-  patch.push({id:'headless-runner',inject:['headlessStartup','teacherModelReady']});
+  patch.push(acp?{id:'acp',inject:['acpAppStartup','agentLoop','teacherModelReady','teacherResidentModelReady']}:{id:'headless-runner',inject:['headlessStartup','teacherModelReady']});
  }
  patch.push({insert:[{id:'teacher-reply-stream',name:pathToFileURL(fileURLToPath(new URL('../scripts/dsh-reply-stream.mjs',import.meta.url))).href}]});
+ patch.push({insert:[{id:'teacher-execution-progress',name:pathToFileURL(fileURLToPath(new URL('../scripts/dsh-progress.mjs',import.meta.url))).href}]});
+ if(acp){if(!modelConfig?.registry)patch.push({id:'acp',inject:['acpAppStartup','agentLoop','teacherResidentModelReady']});const selected=modelConfig?.selection||patch.find(p=>p.id==='agent-default-model')?.config;patch.push({insert:[{id:'teacher-resident-model',name:pathToFileURL(fileURLToPath(new URL('../scripts/dsh-resident-model.mjs',import.meta.url))).href,config:{selection:selected||null}}]});if(selected)patch.push({id:'acp',config:{provider:selected.provider,model:selected.model}});return patch;}
  patch.push({insert:[{id:'mcp-teacher-job',name:'@deepseek-ai/dsh-mcp-client',config:{serverName:'teacher_job',transport:'stdio',command:node,args:[bridge],env:{TEACHER_HOST_URL:baseUrl,TEACHER_HOST_TOKEN:token},failOnStartupError:true,reconnect:{enabled:false},toolCallTimeoutMs:60000}}]});
  return patch;
 }

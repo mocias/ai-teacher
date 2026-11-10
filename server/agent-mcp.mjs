@@ -1,12 +1,12 @@
 import {z} from 'zod';
-import {tools} from './tools.mjs';
-import {moduleTools,configurationTools,executionTools,guidePrompt} from './agent-policy.mjs';
+import {tools,callJobTool} from './tools.mjs';
+import {moduleTools,configurationTools,executionTools,guidePrompt,isPlanningChat,planningChatPrompt} from './agent-policy.mjs';
 import {limitStudyContext} from './study.mjs';
 const fail=m=>{throw Object.assign(new Error(m),{status:403});};
 const common=['teacher_claim_message','teacher_get_context','teacher_reply','teacher_renew_lease'];
-const special=['teacher_propose_goal_draft','teacher_propose_profile','teacher_review_changes','teacher_record_reason'];
+const special=['teacher_propose_goal_draft','teacher_propose_profile','teacher_review_changes','teacher_record_reason','teacher_advance_learning_plan'];
 export function agentCatalog(role){
- const names=[...new Set([...common,...(role==='master'?configurationTools:role==='chat'?special:role==='onboarding'?['teacher_propose_profile']:role==='change_review'?['teacher_propose_profile','teacher_review_changes','teacher_record_reason']:moduleTools[role]||[])])];
+ const names=[...new Set([...common,...(role==='master'?configurationTools:role==='chat'?[...special,...moduleTools.chat]:role==='onboarding'?['teacher_propose_profile']:role==='change_review'?['teacher_propose_profile','teacher_review_changes','teacher_record_reason']:moduleTools[role]||[])])];
  return names.map(name=>({name,description:tools[name].description,schema:name==='teacher_claim_message'?z.object({conversation_id:z.string().optional()}):tools[name].schema.omit({conversation_id:true,goal_id:true,assessment_id:true}).extend({job_id:z.string(),lease_token:z.string()})}));
 }
 export function agentInvoke(store,role,name,input){
@@ -30,10 +30,10 @@ export function agentInvoke(store,role,name,input){
   if(!allowed.includes(a.content_id))fail('资料不属于当前任务');
   if(name==='teacher_analyze_material'&&!store.db.prepare('SELECT 1 FROM receipts WHERE request_id=?').get(job.id+':read:'+a.content_id))fail('先读取材料正文再保存分析');
  }
- if(name==='teacher_assessment_feedback'&&!as?.rounds.some(r=>r.id===a.round_id))fail('题目不属于当前考察');
+ if(['teacher_assessment_feedback','teacher_assessment_explanation'].includes(name)&&!as?.rounds.some(r=>r.id===a.round_id))fail('题目不属于当前考察');
  if(name==='teacher_finish_assessment')for(const j of a.readiness||[])for(const id of j.evidence_ids||[])if(!store.db.prepare('SELECT id FROM evidence WHERE id=? AND goal_id=?').get(id,context.goal.id))fail('证据不属于当前目标');
- const result=tools[name].call(store,tools[name].schema.parse(values));
+ const result=callJobTool(store,job.id,name,tools[name].schema.parse(values));
  if(name==='teacher_read_material')store.db.prepare('INSERT OR IGNORE INTO receipts VALUES(?,?,?)').run(job.id+':read:'+a.content_id,'agent-read','{}');
  return result;
 }
-function jobContext(store,job){const c=store.context(job.conversation_id),index=c.messages.findIndex(m=>m.id===job.message_id);c.messages=c.messages.slice(0,index+1);limitStudyContext(c);return {...c,claimed_message_id:job.message_id};}
+function jobContext(store,job){const c=store.context(job.conversation_id,job.message_id),index=c.messages.findIndex(m=>m.id===job.message_id);c.messages=c.messages.slice(0,index+1);limitStudyContext(c);const task=store.db.prepare('SELECT * FROM job_execution WHERE job_id=?').get(job.id);return {...c,claimed_message_id:job.message_id,...(isPlanningChat(task,c)?{planning_chat_instructions:planningChatPrompt}:{})};}

@@ -1,25 +1,25 @@
-# V0.7.0 私人仓库预发布检查
+# V0.18.0 公开预发布检查
 
-日期：2026-10-19。仓库 `mocias/ai-teacher` 已存在且为私人仓库。此版发布源码与 Windows x64 免安装 ZIP；需要仓库访问权限才能下载。不是签名安装器或稳定版承诺。
-
-## 发布构建
-
-- 修复生产依赖检查发现的四项告警：MCP SDK 更新至 1.32.1、fast-uri 至 3.1.8、ip-address 至 10.7.4、proxy-addr 至 2.0.8；锁文件保留精确版本。
-- 修复后运行 `npm audit --omit=dev`，当前报告为 0 项。它不覆盖应用本身全部风险，也不代表未来不会出现新公告。
-- 完整业务回归 86 项通过；语法和必需资源检查通过。使用独立数据与本机固定回复模型运行成品完整学习、复习反馈、补学恢复、强化和最终完成流程，另外执行阅读器验收。
-- 保留 Apache-2.0 原创代码授权，以及 Electron、Node 和生产依赖的许可证与第三方声明。
-- Git 与源码 ZIP 排除应用输出目录、node_modules、本机配置、学习库和凭据。应用 ZIP 包含内置运行环境及依赖，不包含正式学习数据。凭据模式扫描是有限检查，不是完整安全审计。
+日期：2026-11-10（Asia/Shanghai）。公开仓库 `mocias/ai-teacher`，发布源码与 Windows x64 免安装 ZIP。下载无需仓库邀请；这是预发布版，尚无代码签名、安装向导或自动更新。
 
 ## 下载和使用
 
-Release 提供 `ai-teacher-v0.7.0-windows-x64.zip`、`ai-teacher-v0.7.0-source.zip`、`SHA256SUMS.txt` 和 `verification.json`。Windows 包完整解压后运行文件夹中的 `AI Teacher.exe`；不能只移动 EXE。先关闭旧版本窗口与服务，再打开新版。
+到 [v0.18.0 发布页](https://github.com/mocias/ai-teacher/releases/tag/v0.18.0) 下载 `ai-teacher-v0.18.0-windows-x64.zip`，完整解压后运行 `AI Teacher-win32-x64/AI Teacher.exe`。程序内置 Electron 与 Node，无需另装 Node.js；不要只移动 EXE。首次使用在「模型与分工」配置自己的 API，或选择已安装、配置好的 DSH / Codex / Claude Code。应用不附带模型账号与额度。
 
-发布构建在 `outputs/desktop-v0.7.0-release/AI Teacher-win32-x64`；发布资产在 `outputs/release-v0.7.0`。旧版应用、快捷方式与正式学习库保留。新版继续使用既有桌面数据目录设置；首次打开旧库的新增结构迁移会先创建相应数据库备份。
+默认学习库在 `%APPDATA%\AI Teacher\data`，自定义目录在「桌面设置」查看。升级前退出旧应用和服务并备份整个数据目录；新版放在独立文件夹，继续使用原学习库。本次发布保留此前成品、快捷方式及学习数据。
 
-源码建议使用 `npm ci` 安装锁定版本后运行 `npm test`、`npm run build`。开发桌面启动用 `npm run desktop`；打包用 `npm run desktop:package`。
+## 构建和验证
 
-## 验证边界
+- Windows x64，Node 24.13.0，Electron 44.4.1；按当前锁文件生成生产依赖许可证。网络下载不可用时使用本机已安装的同版本 Electron 分发文件生成构建缓存，未升级运行环境。
+- `npm run build` 通过；2026-11-10 完整 `npm test` 为 339/339 通过。
+- 实际发布成品通过 `--packaged --layout` 与 `--packaged --choices`，包含应用启动、原生菜单、服务退出、拖动布局、路线文本与箭头端点、首页与规划入口、考察暂停/继续及提前结束、阅读答疑区域和可点击选择题等隔离检查。
+- `--packaged --learning` 在“能力提案”步骤超时，未作为通过项。本次未证明完整学习闭环端到端验收全部通过。
+- 业务与桌面检查使用隔离学习库、固定回复模型或手动测试宿主；真实 DSH 的提前结束评语、所有云模型的付费推理与教学质量不在本次验证范围内。
+- 核对成品的 server、public、desktop 共 133 个文件与源码逐字节一致。打包器仅从 package.json 移除 private、scripts、devDependencies，运行字段一致。
+- Git 与分发包排除个人学习数据库、密钥、日志及实际宿主配置；保留 Apache-2.0 和第三方许可证。发布附件提供 ZIP 完整性检查、SHA-256 和 `verification.json`。凭据模式检查不是完整安全审计。
 
-仅验证 Windows x64，尚无安装器、代码签名或自动更新。模型功能需要自行配置 API 或安装并登录兼容宿主；模拟模型流程验证不代表真实教学质量。本次未重新验证 PPT 转换、OCR 或独立干净虚拟机环境。模型调用会把相应上下文发送到用户配置的服务。
+## 发布资产
 
-旧的 2026-09 发布检查记录描述过无仓库、缺授权和依赖告警；这些历史结论已由本次实际检查更新，不能继续作为当前发布状态。
+构建目录为 `outputs/desktop-v0.18.0-release/AI Teacher-win32-x64`；附件在 `outputs/release-v0.18.0`：Windows ZIP、源码 ZIP、`SHA256SUMS.txt`、`verification.json`。
+
+仅验证 Windows x64；未验证独立干净虚拟机、macOS/Linux 成品、PPT 转换、OCR 或所有真实模型。下载包没有自动更新功能，需手动下载后续版本。

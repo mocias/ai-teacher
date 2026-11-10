@@ -41,11 +41,11 @@ export function dshSessionService(db,file){
  function safePaths(row,dataDir,create=false){const p=paths(row,dataDir),data=resolve(dataDir);inside(data,p.root);const check=()=>{for(const path of [join(data,'dsh-workspaces'),join(data,'dsh-runtime'),join(data,'dsh-runtime','conversations'),p.root,dirname(p.home),p.home,p.workDir,p.logs,dirname(p.checkpoint)])if(existsSync(path)){const actual=realpathSync(path),expected=resolve(realpathSync(data),relative(data,path));if(!same(actual,expected))fail('DSH 工作区包含改变目录归属的链接，已停止恢复');}};check();if(create){mkdirSync(p.workDir,{recursive:true});mkdirSync(p.home,{recursive:true});check();}return p;}
  function idle(row){if(row.state==='RUNNING'||row.process_pid&&alive(row.process_pid))fail('该对话上一次 DSH 进程仍在运行，请等待其退出后恢复');if(one("SELECT id FROM jobs WHERE conversation_id=? AND status='RUNNING'",row.conversation_id))fail('该对话仍有执行中的任务，请先取消或等待完成');}
  function locate(row,p){const files=logFiles(p.logs);const matches=[];for(const path of files){let h;try{h=header(path);}catch{fail('DSH 会话日志损坏，请检查并恢复检查点');}if(!same(h.cwd,p.workDir))fail('DSH 会话记录的工作目录已改变，请恢复原目录或重建会话');if(row.session_id&&h.id!==row.session_id)fail('DSH 工作区出现其他会话，已停止自动恢复');matches.push({path,header:h});}if(matches.length>1){const ids=new Set(matches.map(item=>item.header.id));if(ids.size>1)fail('DSH 工作区包含多个会话，无法自动选择');matches.sort((a,b)=>Number(b.path.match(/\.v(\d+)\./)?.[1]||0)-Number(a.path.match(/\.v(\d+)\./)?.[1]||0));}return matches[0];}
- function remember(id,sessionId,cwd,dataDir){if(typeof sessionId!=='string'||!/^session-[A-Za-z0-9_-]{1,150}$/.test(sessionId))fail('DSH 返回了无效的会话标识');const row=get(id),p=safePaths(row,dataDir);if(!same(cwd||'',p.workDir))fail('DSH 返回的工作区与当前对话不一致');if(row.session_id&&row.session_id!==sessionId)fail('DSH 返回的会话与站内映射不一致');try{run('UPDATE dsh_sessions SET session_id=?,cwd=?,updated_at=? WHERE conversation_id=?',sessionId,p.workDir,now(),id);run('UPDATE harness_runs SET dsh_session_id=? WHERE id=?',sessionId,row.last_run_id);}catch{fail('DSH 会话已绑定其他站内对话，不能重复使用');}}
- function prepare(id,{dataDir,jobId,runId}){
+ function remember(id,sessionId,cwd,dataDir){if(typeof sessionId!=='string'||! /^(?:session-[A-Za-z0-9_-]{1,150}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(sessionId))fail('DSH 返回了无效的会话标识');const row=get(id),p=safePaths(row,dataDir);if(!same(cwd||'',p.workDir))fail('DSH 返回的工作区与当前对话不一致');if(row.session_id&&row.session_id!==sessionId)fail('DSH 返回的会话与站内映射不一致');try{run('UPDATE dsh_sessions SET session_id=?,cwd=?,updated_at=? WHERE conversation_id=?',sessionId,p.workDir,now(),id);run('UPDATE harness_runs SET dsh_session_id=? WHERE id=?',sessionId,row.last_run_id);}catch{fail('DSH 会话已绑定其他站内对话，不能重复使用');}}
+ function prepare(id,{dataDir,jobId,runId,ownedPid}){
   if(!one('SELECT id FROM conversations WHERE id=?',id))fail('站内对话不存在');
   let row=get(id);if(!row){run("INSERT INTO dsh_sessions(conversation_id,workspace_key,workspace_layout,created_at,updated_at) VALUES(?,?,'SHARED',?,?)",id,createHash('sha256').update(id).digest('hex'),now(),now());row=get(id);}
-  if(row.process_pid&&alive(row.process_pid))fail('该对话的 DSH 进程尚未退出，不能同时恢复');
+  if(row.process_pid&&alive(row.process_pid)&&row.process_pid!==ownedPid)fail('该对话的 DSH 进程尚未退出，不能同时恢复');
   if(row.workspace_layout==='LEGACY'){archiveAndReset(row,dataDir);row=get(id);}
   let p,found;try{p=safePaths(row,dataDir,true);if(row.cwd&&!same(row.cwd,p.workDir))fail('学习数据目录已移动，原 DSH 工作区路径不再一致；请检查后重建会话');found=locate(row,p);if(row.session_id&&!found)fail('DSH 会话日志缺失，请检查并恢复检查点');if(!row.session_id&&found){remember(id,found.header.id,found.header.cwd,dataDir);row=get(id);}}
   catch(error){run("UPDATE dsh_sessions SET state='RECOVERY_REQUIRED',error=?,updated_at=? WHERE conversation_id=?",error.message,now(),id);throw error;}
@@ -54,13 +54,13 @@ export function dshSessionService(db,file){
   return {...p,sessionId:row.session_id,generation:row.generation};
  }
  function pid(id,value){run('UPDATE dsh_sessions SET process_pid=? WHERE conversation_id=?',Number.isInteger(value)?value:null,id);}
- function finish(id,{dataDir,runId,completed,clean,interrupted,error}){
+ function finish(id,{dataDir,runId,completed,clean,interrupted,error,processPid=null}){
   const row=get(id);if(!row||row.last_run_id!==runId)return;
   let state=interrupted?'INTERRUPTED':completed&&clean?'READY':'FAILED',message=error||null;
   try{const p=safePaths(row,dataDir),found=locate(row,p);if(!row.session_id&&found)remember(id,found.header.id,found.header.cwd,dataDir);
    if(completed&&clean){if(!found)fail('DSH 已回写，但会话日志尚未完整落盘，请检查恢复');const checksum=hashFile(found.path,true);atomicCopy(found.path,p.checkpoint);run('UPDATE dsh_sessions SET log_path=?,checkpoint_path=?,checkpoint_hash=? WHERE conversation_id=?',relative(p.home,found.path),relative(p.home,p.checkpoint),checksum,id);}
   }catch(problem){state='RECOVERY_REQUIRED';message=problem.message;}
-  run('UPDATE dsh_sessions SET state=?,error=?,process_pid=NULL,updated_at=? WHERE conversation_id=?',state,message,now(),id);
+  run('UPDATE dsh_sessions SET state=?,error=?,process_pid=?,updated_at=? WHERE conversation_id=?',state,message,processPid,now(),id);
  }
  function recover(){for(const row of db.prepare("SELECT * FROM dsh_sessions WHERE state='RUNNING'").all()){const job=one('SELECT status FROM jobs WHERE id=?',row.last_job_id);run("UPDATE dsh_sessions SET state='INTERRUPTED',error=?,process_pid=?,updated_at=? WHERE conversation_id=?",job?.status==='COMPLETED'?'上次回复已保存；DSH 退出状态未确认，下一轮继续恢复原会话':'上次执行中断；保留原会话，检查后重试原任务',row.process_pid&&alive(row.process_pid)?row.process_pid:null,now(),row.conversation_id);}}
  function check(id,{dataDir,restore=false}={}){

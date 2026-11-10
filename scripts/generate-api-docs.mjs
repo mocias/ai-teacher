@@ -1,6 +1,7 @@
-import {writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {tools} from '../server/tools.mjs';
 import {version} from '../server/version.mjs';
+import {canonicalPaths} from './canonical-api.mjs';
 import {learningLoopPaths} from './learning-loop-api.mjs';
 import {zodToJsonSchema} from 'zod-to-json-schema';
 mkdirSync(new URL('../docs/',import.meta.url),{recursive:true});
@@ -14,7 +15,7 @@ const entries=[
  ['models/test','发出简短 API 连接测试（消耗供应商额度）',{id:string},['id']],
  ['models/retry','显式重试或重新分配等待中的任务',{job_id:string,mode:{enum:['HOST','API']},profile_id:string},['job_id','mode']],
  ['capabilities/decide','确认或拒绝能力要求提案',{id:string,accept:bool},['id','accept']],
- ['material-content','保存不可变的资料正文与范围',{resource_id:string,scope:string,content:string},['resource_id','scope','content']],
+ ['material-content','保存不可变的资料正文与该目标的约定范围',{resource_id:string,goal_id:string,scope:string,content:string},['resource_id','scope','content']],
  ['assessments','发起结构化考察',{goal_id:string,kind:{enum:['INITIAL_DIAGNOSTIC','MATERIAL_SUPPLEMENT','INCREMENTAL_DIAGNOSTIC','QUICK_CHECK','LEARN','REVIEW_DIAGNOSTIC','REVIEW','REINFORCEMENT','ASSESSMENT_REVIEW','NOTE_VERIFICATION','FREE_TEST','FINAL']},mode:{enum:['OPEN_BOOK','CLOSED_BOOK']},scope:string,requirement_ids:{type:'array',items:string},resource_ids:{type:'array',items:string},session_id:string,parent_id:string,gap_id:string,request_id:string},['goal_id','kind','mode','request_id']],
  ['assessments/end','用户提前结束考察，保留问答，不完成目标',{id:string},['id']],
  ['gaps/route','用户选择缺口处理方向',{id:string,status:{enum:['IGNORED','ROUTED_TO_REVIEW','ROUTED_TO_LEARN']}},['id','status']],
@@ -25,8 +26,9 @@ const entries=[
  ['goals/archive','归档或恢复已结束目标的可见性',{id:string,archived:bool},['id','archived']],
  ['goals','创建目标',{title:string,domain:string,scope:string},['title','domain']],
  ['conversations','创建目标内的规划对话',{goal_id:string,title:string},['goal_id','title']],
- ['messages','保存用户消息并排队',{conversation_id:string,content:string,request_id:string,task_kind:{enum:['chat','material','capabilities','roadmap','assessment','review','final']},content_id:string},['conversation_id','content','request_id']],
- ['resources','用户指定学习资料',{goal_id:string,title:string,url:{type:'string',format:'uri'},role:{enum:['PRIMARY','SUPPLEMENTARY','REFERENCE']},saved:bool},['title','role']],
+ ['sessions/learning','进入已确认任务的独立学习对话，重复进入复用记录',{session_id:string,request_id:string},['session_id','request_id']],
+ ['messages','保存文字消息或点击选择题答案并排队',{conversation_id:string,content:string,choice_answer:{type:'object',properties:{question_message_id:string,option_ids:{type:'array',items:string,minItems:1,maxItems:8,uniqueItems:true}},required:['question_message_id','option_ids'],additionalProperties:false},request_id:string,attachment_resource_ids:{type:'array',items:string,maxItems:5,uniqueItems:true,description:'普通对话的已保存文件引用，总大小不超过20MiB；正式考察不接受附件。'},task_kind:{enum:['chat','material','capabilities','roadmap','assessment','review','final']},content_id:string},['conversation_id','request_id']],
+ ['resources','保存网页资料或本地文件副本（最多 20 MiB）',{request_id:{type:'string',description:'可选幂等上传标识，用于响应丢失后的安全重试'},goal_id:string,title:string,url:{type:'string',format:'uri'},role:{enum:['PRIMARY','SUPPLEMENTARY','REFERENCE']},saved:bool,scope:string,file:{type:'object',properties:{name:{type:'string',maxLength:255},base64:{type:'string',description:'原文件的 base64 内容'}},required:['name','base64']}},[]],
  ['notes','新建或编辑用户笔记',{id:string,goal_id:string,title:string,content:string},['title','content']],
  ['notes/archive','归档或恢复笔记',{id:string,archived:bool},['id','archived']],
  ['prompts','更新 Teacher 提示词并保留旧版本',{content:string},['content']],
@@ -38,10 +40,23 @@ const entries=[
 const responses={'200':{description:'操作结果'},'400':{description:'参数无效'},'401':{description:'身份凭据缺失'},'403':{description:'调用身份不允许'},'409':{description:'状态冲突'}};
 const paths={};for(const [path,summary,properties,required]of entries)paths['/api/'+path]={post:{summary,security:[{UserSession:[]}],requestBody:{required:true,content:{'application/json':{schema:{type:'object',properties,required}}}},responses}};
 for(const [path,summary]of [['state','读取 Web 工作台状态（包含用户自己可见的归档笔记）'],['export','导出主要学习数据，不含密钥；不是完整数据库备份'],['health','本地服务健康检查'],['events','SSE 数据变更通知；客户端重新读取状态']])paths['/api/'+path]={get:{summary,security:path==='health'?[]:[{UserSession:[]}],responses:{'200':{description:path==='events'?'text/event-stream':'JSON 数据'}}}};
+paths['/api/messages'].post.requestBody.content['application/json'].schema.anyOf=[{required:['content']},{required:['choice_answer']}];
 paths['/api/messages'].get={summary:'读取对话消息',security:[{UserSession:[]}],parameters:[{name:'conversation_id',in:'query',required:true,schema:string}],responses};
 for(const [path,summary] of [['assessment-rounds','读取逐题记录，正式考察结束前不显示反馈'],['material-content','读取指定正文版本']])paths['/api/'+path]={...(paths['/api/'+path]||{}),get:{summary,security:[{UserSession:[]}],parameters:[{name:'id',in:'query',required:true,schema:string}],responses}};
 paths['/api/agent/tool']={post:{summary:'供外部 Agent 使用的受限业务接口',security:[{AgentBearer:[]}],requestBody:{required:true,content:{'application/json':{schema:{oneOf:Object.entries(tools).map(([name,t])=>({type:'object',properties:{name:{const:name},arguments:zodToJsonSchema(t.schema)},required:['name','arguments']}))}}}},responses}};
 paths['/mcp']={post:{summary:'标准 Streamable HTTP MCP；同一组 Agent 工具',security:[{AgentBearer:[]}],requestBody:{required:true,content:{'application/json':{schema:{type:'object'}}}},responses:{'200':{description:'MCP JSON-RPC response'},'202':{description:'Notification accepted'}}}};
-Object.assign(paths,learningLoopPaths);
+Object.assign(paths,learningLoopPaths,canonicalPaths);
+const resourceSchema=paths['/api/resources'].post.requestBody.content['application/json'].schema;
+delete resourceSchema.required;
+resourceSchema.description='title 可从文件名生成；goal_id 可留空；role 默认 REFERENCE。TXT/Markdown 符合长度和编码要求时同时保存正文。';
+paths['/api/material-content'].get.parameters.push({name:'goal_id',in:'query',schema:string,description:'资料已与目标关联时传入当前目标 ID。'});
+Object.assign(paths['/api/messages'].post.requestBody.content['application/json'].schema.properties,{
+ learning_intent:{enum:['NOTE_VERIFICATION','KNOWLEDGE_PROFILE','TOPIC_REORGANIZATION']},subject_id:string
+});
+// Some desktop/host operations are documented by hand. Keep them when regenerating learning tools.
+const previous=JSON.parse(readFileSync(new URL('../docs/openapi.json',import.meta.url),'utf8'));
+for(const [path,operations] of Object.entries(previous.paths)){
+ paths[path]={...operations,...paths[path]};
+}
 writeFileSync(new URL('../docs/openapi.json',import.meta.url),JSON.stringify({openapi:'3.1.0',info:{title:'AI Teacher Local API',version,description:'仅可信本机单用户使用。Web 首次 GET / 获得 HttpOnly 会话 cookie。Agent 使用 data/agent-token 中的 Bearer 凭据。启用执行器后会调用所选模型或本机 Codex。'},servers:[{url:'http://127.0.0.1:4317'}],components:{securitySchemes:{UserSession:{type:'apiKey',in:'cookie',name:'teacher_session'},AgentBearer:{type:'http',scheme:'bearer'}}},paths},null,2));
 console.log('OpenAPI document generated.');

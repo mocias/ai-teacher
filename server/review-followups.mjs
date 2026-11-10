@@ -12,7 +12,7 @@ export function reviewFollowups(db,file,{receipt}){
   }
   db.exec('CREATE TABLE review_sources(review_id TEXT PRIMARY KEY REFERENCES reviews(id),assessment_id TEXT NOT NULL REFERENCES assessments(id),evidence_id TEXT NOT NULL REFERENCES evidence(id),created_at TEXT NOT NULL)');
  }
- function schedule(a){return receipt(a.request_id,'review-followup:'+a.source_assessment_id,()=>{
+ function scheduleInTransaction(a){
   if(typeof a.source_assessment_id!=='string'||!a.source_assessment_id||typeof a.requirement_id!=='string'||!a.requirement_id)fail('请选择已完成的考察和对应能力要求');
   const source=one('SELECT * FROM assessments WHERE id=?',a.source_assessment_id);
   if(source?.status!=='COMPLETED')fail('请先完成考察，再根据回答安排复习');
@@ -33,7 +33,8 @@ export function reviewFollowups(db,file,{receipt}){
   run('INSERT INTO review_sources VALUES(?,?,?,?)',id,source.id,evidence.id,now);
   if(gap)run("UPDATE gaps SET status='ROUTED_TO_REVIEW',updated_at=? WHERE id=?",now,gap.id);
   return {id,reused:false,due_date:a.due_date};
- });}
+ }
+ function schedule(a){return receipt(a.request_id,'review-followup:'+a.source_assessment_id,()=>scheduleInTransaction(a));}
  function cancel(a){return receipt(a.request_id,'cancel-review:'+a.id,()=>{
   if(typeof a.id!=='string'||!a.id)fail('请选择要取消的复习');
   const review=one('SELECT * FROM reviews WHERE id=?',a.id);if(!review)fail('复习不存在');
@@ -43,5 +44,5 @@ export function reviewFollowups(db,file,{receipt}){
   if(review.gap_id&&!one("SELECT id FROM reviews WHERE gap_id=? AND status IN ('DUE','IN_PROGRESS')",review.gap_id))run("UPDATE gaps SET status='DETECTED',updated_at=? WHERE id=? AND status='ROUTED_TO_REVIEW'",new Date().toISOString(),review.gap_id);
   return {ok:true};
  });}
- return {schedule,cancel};
+ return {schedule,scheduleInTransaction,cancel};
 }

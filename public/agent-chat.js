@@ -1,15 +1,17 @@
-import {icon,agentNavigation,enhanceComposer,enhanceMessages,setSendButton,resizeComposer} from './chat-ui.js';
+import {readingPosition,restoreReadingPosition,icon,agentNavigation,enhanceComposer,enhanceMessages,setSendButton,resizeComposer} from './chat-ui.js';
 import {bindDshModelPicker} from './dsh-model-picker.js';
 import {watchUpdates} from './live-events.js';
 import {bindReplyStream} from './reply-stream.js';
 import {messageContent,escapeText as esc} from './message-content.js';
+import {bindAgentLayout} from './layout-resize.js';
 const $=s=>document.querySelector(s);
 $('#agent-navigation').innerHTML=agentNavigation();
+bindAgentLayout(document);
 const api=async(p,a)=>{const r=await fetch('/api/'+p,a===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(a)}),v=await r.json();if(!r.ok)throw Error(v.error);return v;};
 let cid,request,busy=false,refreshing=false,queued=false,first=true,lastHTML='';
 const showError=e=>{$('#error').textContent=e?.message||'';$('#error').hidden=!e;};
-const bottom=()=>{const list=$('#messages');return list.scrollHeight-list.scrollTop-list.clientHeight<100;};
-function jump(){const list=$('#messages');list.scrollTop=list.scrollHeight;$('#jump-latest').hidden=true;}
+const bottom=()=>readingPosition($('#messages'))===null;
+function jump(){restoreReadingPosition($('#messages'));$('#jump-latest').hidden=true;}
 function persistDraft(){try{localStorage.setItem('teacher-master-draft:'+cid,$('#content').value);}catch{$('#draft-status').textContent='当前无法保存草稿，请发送前保留副本';}}
 function sessionInfo(state){
  const session=state.agents?.dsh_sessions?.find(s=>s.conversation_id===cid),route=state.agents?.routes?.find(r=>r.role==='master');
@@ -19,20 +21,20 @@ function sessionInfo(state){
 async function refresh(){
  if(!cid)return;if(refreshing){queued=true;return;}refreshing=true;
  try{do{queued=false;const [state,messages]=await Promise.all([api('state'),api('messages?conversation_id='+encodeURIComponent(cid))]);
- const list=$('#messages'),follow=first||bottom(),html=messages.map(m=>'<article class="message '+(m.role==='user'?'user':'assistant')+'"><div class="avatar" aria-hidden="true">'+(m.role==='user'?'我':'A')+'</div><div class="bubble"><div class="messageheader"><strong>'+(m.role==='user'?'你':'主 Agent')+'</strong><time>'+esc(new Date(m.created_at).toLocaleString('zh-CN',{hour12:false}))+'</time></div><div class="messagetext">'+messageContent(m)+'</div></div></article>').join('')||`<div class="agent-empty"><div class="welcome-emblem">${icon('compass')}</div><h2>一起配好你的学习空间</h2><p>从了解工作台开始，找到适合你的模型和学习方式。</p><div class="agent-starters"><button type="button" data-prompt="介绍一下站点有哪些功能">${icon('grid')}<strong>了解工作台</strong><span>从目标、资料到学习反馈</span></button><button type="button" data-prompt="帮我按低成本选择各个功能的模型配置">${icon('settings')}<strong>搭配学习模型</strong><span>按预算和用途选择 AI</span></button><button type="button" data-prompt="API 和 MCP 宿主有什么区别？">${icon('book')}<strong>了解连接方式</strong><span>理清 API 与 MCP 的区别</span></button></div></div>`;
- if(lastHTML!==html){const oldTop=list.scrollTop;list.innerHTML=html;enhanceMessages(list);lastHTML=html;if(follow)jump();else{list.scrollTop=oldTop;$('#jump-latest').hidden=false;}}first=false;
+ const list=$('#messages'),position=first?null:readingPosition(list),html=messages.map(m=>'<article data-message-id="'+esc(m.id)+'" class="message '+(m.role==='user'?'user':'assistant')+'"><div class="avatar" aria-hidden="true">'+(m.role==='user'?'我':'A')+'</div><div class="bubble"><div class="messageheader"><strong>'+(m.role==='user'?'你':'主 Agent')+'</strong><time>'+esc(new Date(m.created_at).toLocaleString('zh-CN',{hour12:false}))+'</time></div><div class="messagetext">'+messageContent(m)+'</div></div></article>').join('')||`<div class="agent-empty"><div class="welcome-emblem">${icon('compass')}</div><h2>一起配好你的学习空间</h2><p>从了解工作台开始，找到适合你的模型和学习方式。</p><div class="agent-starters"><button type="button" data-prompt="介绍一下站点有哪些功能">${icon('grid')}<strong>了解工作台</strong><span>从目标、资料到学习反馈</span></button><button type="button" data-prompt="帮我按低成本选择各个功能的模型配置">${icon('settings')}<strong>搭配学习模型</strong><span>按预算和用途选择 AI</span></button><button type="button" data-prompt="API 和 MCP 宿主有什么区别？">${icon('book')}<strong>了解连接方式</strong><span>理清 API 与 MCP 的区别</span></button></div></div>`;
+ if(lastHTML!==html){list.innerHTML=html;enhanceMessages(list);lastHTML=html;}first=false;
  $('#status').innerHTML=state.jobs.filter(j=>j.conversation_id===cid&&['QUEUED','RUNNING'].includes(j.status)).map(j=>{
   const task=state.models.tasks.find(t=>t.job_id===j.id),runs=task?.mode==='API'?state.models.runs:state.agents?.runs||[],run=runs.find(r=>r.job_id===j.id&&r.status==='RUNNING'),failure=runs.find(r=>r.job_id===j.id&&r.status==='FAILED');
   const model=run?.model_name||run?.model||'',label=j.status==='RUNNING'?'正在处理':task?.blocked?(failure?.error||'未能完成，请检查配置后重试'):'等待处理';
-  return `<div class="agent-job ${task?.blocked?'blocked':''}"><span class="status-dot" aria-hidden="true"></span><div class="job-description"><span>${esc(label)}</span>${run?`<span class="job-timing" aria-live="off" data-elapsed-start="${esc(run.created_at)}">${Math.max(0,Math.floor((Date.now()-Date.parse(run.created_at))/1000))} 秒</span>`:''}${model?`<small title="${esc((run.model_provider||'')+'/'+model)}">${esc(model)}</small>`:''}${run?.tool_calls?`<small>已调用 ${run.tool_calls} 次工具</small>`:''}</div><div class="row"><button class="small ghost" data-cancel="${j.id}">停止</button>${task?.blocked?`<button class="small" data-retry="${j.id}">重试</button>`:''}</div></div>`;
+  return `<div data-job-status="${j.id}" class="agent-job ${task?.blocked?'blocked':''}"><span class="status-dot" aria-hidden="true"></span><div class="job-description"><span>${esc(label)}</span>${run?`<span class="job-timing" aria-live="off" data-elapsed-start="${esc(run.created_at)}">${Math.max(0,Math.floor((Date.now()-Date.parse(run.created_at))/1000))} 秒</span>`:''}${model?`<small title="${esc((run.model_provider||'')+'/'+model)}">${esc(model)}</small>`:''}${run?.tool_calls?`<small>已调用 ${run.tool_calls} 次工具</small>`:''}</div><div class="row"><button class="small ghost" data-cancel="${j.id}">停止</button>${task?.blocked?`<button class="small" data-retry="${j.id}">重试</button>`:''}</div></div>`;
  }).join('');
- $('#agent-version').textContent='V'+state.version;sessionInfo(state);bindDshModelPicker($('#agent-chat'),state,cid,'master');enhanceComposer($('#agent-chat'));bindReplyStream(list,cid,messages,'master');
+ $('#agent-version').textContent='V'+state.version;sessionInfo(state);bindDshModelPicker($('#agent-chat'),state,cid,'master');enhanceComposer($('#agent-chat'));bindReplyStream(list,cid,messages,'master');restoreReadingPosition(list,position);$('#jump-latest').hidden=bottom();
  }while(queued);}finally{refreshing=false;}
 }
 $('#content').oninput=()=>{request=null;persistDraft();};
 $('#content').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();$('#agent-chat').requestSubmit();}};
-$('#agent-chat').onsubmit=async e=>{e.preventDefault();const input=$('#content'),content=input.value.trim();if(busy||!cid||!content)return;busy=true;$('#send').disabled=true;setSendButton($('#send'),true);showError(null);
- try{request??=crypto.randomUUID();const submitted=input.value;await api('messages',{conversation_id:cid,content,request_id:request});request=null;if(input.value===submitted){input.value='';persistDraft();}first=true;await refresh();input.focus();}catch(error){showError(error);}finally{busy=false;$('#send').disabled=false;setSendButton($('#send'));resizeComposer($('#content'));}};
+$('#agent-chat').onsubmit=async e=>{e.preventDefault();const input=$('#content'),content=input.value.trim();if(busy||!cid||!content)return;jump();busy=true;$('#send').disabled=true;setSendButton($('#send'),true);showError(null);
+ try{request??=crypto.randomUUID();const submitted=input.value;await api('messages',{conversation_id:cid,content,request_id:request});request=null;if(input.value===submitted){input.value='';persistDraft();}await refresh();input.focus({preventScroll:true});}catch(error){showError(error);}finally{busy=false;$('#send').disabled=false;setSendButton($('#send'));resizeComposer($('#content'));}};
 $('#messages').addEventListener('reply-stream-painted',()=>{$('#jump-latest').hidden=bottom();});
 $('#messages').onscroll=()=>{$('#jump-latest').hidden=bottom();};$('#jump-latest').onclick=jump;
 $('#session-toggle').onclick=()=>{const show=$('#session-info').hidden;$('#session-info').hidden=!show;$('#session-toggle').setAttribute('aria-expanded',String(show));};

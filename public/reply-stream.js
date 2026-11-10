@@ -1,11 +1,13 @@
+import {readingPosition,restoreReadingPosition} from './chat-ui.js';
 import {messageContent} from './message-content.js';
+import {bindRunProgress} from './run-progress.js';
 import {liveEvents as events} from './live-events.js';
 const streams=new Map(),bindings=new Map();let scheduled=false;
 function paint(){
  scheduled=false;
  for(const [container,binding] of bindings){
   if(!container.isConnected){bindings.delete(container);continue;}
-  const follow=container.scrollHeight-container.scrollTop-container.clientHeight<100,top=container.scrollTop,keep=new Set();
+  const position=readingPosition(binding.scroller),keep=new Set();
   const latest=new Map();for(const row of streams.values())if(!latest.has(row.job_id)||latest.get(row.job_id).revision<row.revision)latest.set(row.job_id,row);
   for(const row of latest.values()){
    if(row.conversation_id!==binding.cid||!row.content||row.status==='DISCARDED')continue;
@@ -21,13 +23,13 @@ function paint(){
    else element.innerHTML='<div class="avatar" aria-hidden="true">'+(binding.variant==='master'?'A':'T')+'</div><div class="bubble"><div class="messageheader"><strong>'+title+'</strong></div><div class="messagetext">'+content+'</div><div class="reply-stream-label" role="status">'+label+'</div></div>';
   }
   for(const element of container.querySelectorAll('[data-reply-preview]'))if(!keep.has(element.dataset.replyPreview))element.remove();
-  if(follow)container.scrollTop=container.scrollHeight;else container.scrollTop=top;
-  container.dispatchEvent(new CustomEvent('reply-stream-painted',{detail:{following:follow}}));
+  restoreReadingPosition(binding.scroller,position);
+  container.dispatchEvent(new CustomEvent('reply-stream-painted',{detail:{following:position===null}}));
  }
 }
 function schedule(){if(!scheduled){scheduled=true;requestAnimationFrame(paint);}}
-export function bindReplyStream(container,cid,messages=[],variant='chat'){
- if(!container||!cid)return;bindings.set(container,{cid,messages,variant});schedule();
+export function bindReplyStream(container,cid,messages=[],variant='chat',scroller=container){
+ if(!container||!cid)return;bindings.set(container,{cid,messages,variant,scroller});bindRunProgress(container,cid);schedule();
 }
 events.addEventListener('open',()=>{streams.clear();schedule();});
 events.addEventListener('reply-stream',event=>{

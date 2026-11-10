@@ -1,6 +1,6 @@
 {
   "name": "ai-teacher-local",
-  "version": "0.14.1",
+  "version": "0.18.0",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",

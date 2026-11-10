@@ -2,6 +2,7 @@
 export const liveEvents = new EventSource('/api/events');
 let revision=0;
 liveEvents.addEventListener('message',()=>revision++);
+liveEvents.addEventListener('dsh-model-catalog',event=>{try{window.dispatchEvent(new CustomEvent('dsh-model-catalog',{detail:JSON.parse(event.data)}));}catch{}});
 
 export function watchUpdates(refresh, {onError = () => {}, onOpen = () => {}, active = () => !document.hidden, delay = 100, fallbackMs = 60000} = {}) {
  let timer, running = false, pending = false, stopped = false, connected = liveEvents.readyState === EventSource.OPEN;

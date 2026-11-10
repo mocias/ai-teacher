@@ -1,3 +1,4 @@
+if(process.env.FAKE_DSH_ACP){await import('./fake-dsh-acp.mjs');process.exit(0);}
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';

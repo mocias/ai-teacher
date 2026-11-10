@@ -28,7 +28,7 @@ test('main API only introduces the project and configures features; unconfigured
  const work=message(s,'capabilities');const onboarding=s.study.onboarding({action:'start',request_id:id()});await x.tick();assert.equal(seen.length,0);assert.equal(s.claim('legacy').job,null);
  assert.equal(s.models.state().tasks.find(t=>t.job_id===work.job_id).mode,'UNCONFIGURED');assert.equal(s.models.state().tasks.at(-1).agent_role,'onboarding');
  const guide=guideMessage(s);await x.tick();assert.equal(seen.length,1);assert.equal(s.messages(guide.conversation.id).at(-1).role,'assistant');assert.equal(s.messages(work.conversation.id).length,1);assert.equal(s.messages(onboarding.conversation_id).length,1);
- assert.deepEqual(seen[0].tools.map(t=>t.function.name).sort(),['teacher_get_agent_configuration','teacher_propose_agent_configuration']);assert.ok(!JSON.stringify(seen).includes('credential-never-in-context'));assert.ok(!JSON.stringify(seen).includes(work.conversation.id));
+ assert.deepEqual(seen[0].tools.map(t=>t.function.name).sort(),['teacher_get_agent_configuration','teacher_propose_agent_configuration','teacher_set_agent_configuration']);assert.ok(!JSON.stringify(seen).includes('credential-never-in-context'));assert.ok(!JSON.stringify(seen).includes(work.conversation.id));
 });
 
 test('functional API calls go straight to the configured model, with no main-agent call or fallback',async t=>{
@@ -53,7 +53,7 @@ test('main proposes feature connections, user confirms atomically, stale proposa
 
 test('sharing the main API profile requires explicit feature selection and keeps tools separate',async t=>{
  const s=setup(t);main(s,'API');const j=message(s,'chat'),p=s.agents.route('master').profile_id;assert.equal(s.models.state().tasks[0].mode,'UNCONFIGURED');s.agents.configure({role:'chat',mode:'API',profile_id:p});assert.equal(s.models.state().tasks[0].mode,'UNCONFIGURED');s.agents.retry({job_id:j.job_id});
- const seen=[];const x=modelExecutor(s,{intervalMs:1000000,fetcher:async(_u,o)=>{seen.push(JSON.parse(o.body));return response({content:'普通对话回复'});}});t.after(()=>x.stop());await x.tick();assert.equal(seen[0].model,'main');assert.equal(seen[0].tools,undefined);assert.equal(s.models.state().tasks[0].agent_role,'chat');assert.throws(()=>s.agents.retry({job_id:j.job_id,to_master:true}),/不能交给/);
+ const seen=[];const x=modelExecutor(s,{intervalMs:1000000,fetcher:async(_u,o)=>{seen.push(JSON.parse(o.body));return response({content:'普通对话回复'});}});t.after(()=>x.stop());await x.tick();assert.equal(seen[0].model,'main');assert.deepEqual(seen[0].tools.map(t=>t.function.name),['teacher_advance_learning_plan','teacher_reply']);assert.equal(s.models.state().tasks[0].agent_role,'chat');assert.throws(()=>s.agents.retry({job_id:j.job_id,to_master:true}),/不能交给/);
 });
 
 test('scoped material MCP cannot read foreign material and rejects expired or cancelled leases',t=>{

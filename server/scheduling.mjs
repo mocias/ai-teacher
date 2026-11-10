@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 const fail=message=>{throw Object.assign(new Error(message),{status:409});};
 const day=n=>new Date(n).toISOString().slice(0,10),DAY=86400000;
-export function schedulePreview(db,a){
+export function schedulePreview(db,a,{isSessionExecutable=()=>true}={}){
  const goal=db.prepare('SELECT * FROM goals WHERE id=?').get(a.goal_id);
  if(goal?.status!=='ACTIVE')fail('请先确认路线并恢复目标，再安排学习');
  if(typeof a.start_date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(a.start_date)||!Number.isFinite(Date.parse(a.start_date))||day(Date.parse(a.start_date))!==a.start_date)fail('开始日期无效');
@@ -13,15 +13,16 @@ export function schedulePreview(db,a){
  const proposals=db.prepare('SELECT * FROM proposals WHERE goal_id=?').all(goal.id);
  const sets=db.prepare("SELECT id FROM capability_sets WHERE goal_id=? AND status='ACCEPTED'").all(goal.id);
  const details=db.prepare('SELECT * FROM roadmap_details WHERE proposal_id IN (SELECT id FROM proposals WHERE goal_id=?)').all(goal.id);
- const eligible=sessions.filter(s=>s.status==='PLANNED'&&!calendar.some(e=>e.session_id===s.id));
- if(eligible.some(s=>sets.length&&!details.some(d=>d.proposal_id===s.proposal_id&&d.set_id===sets[0].id)))fail('能力要求已更新，请先确认新版路线');
+ const unplanned=sessions.filter(s=>s.status==='PLANNED'&&!calendar.some(e=>e.session_id===s.id));
+ if(unplanned.some(s=>sets.length&&!details.some(d=>d.proposal_id===s.proposal_id&&d.set_id===sets[0].id)))fail('能力要求已更新，请先确认新版路线');
+ const eligible=unplanned.filter(s=>isSessionExecutable(s.id));
  const info=s=>JSON.parse(proposals.find(p=>p.id===s.proposal_id)?.items||'[]')[s.position]||{};
  const prerequisite=s=>{const i=info(s);return sessions.filter(p=>p.proposal_id===s.proposal_id&&i.dependencies?.includes(info(p).key));};
  const pending=new Set(eligible.map(s=>s.id)),ordered=[],visiting=new Set(),visited=new Set();
  function visit(s){if(visited.has(s.id))return;if(visiting.has(s.id))fail('路线依赖存在循环');visiting.add(s.id);for(const p of prerequisite(s))if(pending.has(p.id))visit(p);visiting.delete(s.id);visited.add(s.id);ordered.push(s);}
  eligible.forEach(visit);
  const input={goal_id:goal.id,start_date:a.start_date,daily_minutes:a.daily_minutes,session_minutes:a.session_minutes,weekdays};
- const fingerprint=createHash('sha256').update(JSON.stringify({input,goal,sessions,calendar,proposals,sets,details})).digest('hex');
+ const fingerprint=createHash('sha256').update(JSON.stringify({input,goal,sessions,eligible:eligible.map(s=>s.id),calendar,proposals,sets,details})).digest('hex');
  const load=new Map();for(const e of calendar)load.set(e.date,(load.get(e.date)||0)+e.duration);
  const dates=new Map();for(const s of sessions){const entries=calendar.filter(e=>e.session_id===s.id);if(entries.length)dates.set(s.id,entries.map(e=>e.date).sort().at(-1));}
  const entries=[];let cursor=Date.parse(a.start_date);const limit=cursor+366*DAY;

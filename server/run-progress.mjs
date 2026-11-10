@@ -1,0 +1,22 @@
+// Bounded public execution metadata. Never store reasoning, tool arguments,
+// results, provider error bodies or account details here.
+const labels={teacher_get_context:'读取本轮上下文',teacher_get_agent_configuration:'读取模型与功能配置',teacher_set_agent_configuration:'设置功能模型',teacher_propose_agent_configuration:'整理配置方案',teacher_reply:'写入回复',teacher_propose_profile:'整理画像建议',teacher_read_material:'读取学习资料',teacher_analyze_material:'分析学习资料',teacher_plan_learning:'整理学习路线',teacher_assessment_question:'准备问题',teacher_assessment_feedback:'记录回答反馈',teacher_assessment_explanation:'发布题目讲解',teacher_finish_assessment:'整理考察结果',teacher_propose_goal_draft:'整理目标草案',web_search:'联网搜索',web_fetch:'读取网页'};
+const phases={preparing:'准备模型与会话',connecting:'正在连接宿主',reusing:'正在复用常驻宿主',waiting:'等待模型响应',reasoning:'模型正在整理思路',generating:'模型正在生成内容',tool:'正在调用工具',reply:'正在生成回复正文',completed:'本轮已完成',cancelled:'已取消',failed:'本轮未完成'};
+const errors={WEB_PROVIDER_CREDENTIAL_MISSING:'搜索服务缺少凭据，请在 DSH 中配置联网搜索',WEB_PROVIDER_CONFIGURED_UNAVAILABLE:'搜索服务当前不可用',WEB_PROVIDER_CONFIGURED_MISSING:'配置的搜索提供商未加载',WEB_PROVIDER_UNAVAILABLE:'没有可用的联网提供商',WEB_BLOCKED_URL:'网页地址被 DSH 网络策略拦截，请检查代理与 DNS',WEB_TIMEOUT:'联网请求超时',WEB_SEARCH_BLOCKED:'公开搜索暂时限制访问，请稍后重试',WEB_SEARCH_EMPTY:'没有找到可用来源，请换个查询',WEB_SEARCH_UNEXPECTED_RESPONSE:'搜索服务返回格式异常，请稍后重试',WEB_SEARCH_PROXY_INVALID:'请检查本机搜索代理设置',WEB_SEARCH_PROXY_FAILED:'本机代理未能连接搜索服务',WEB_PROVIDER_ERROR:'搜索服务连接失败，请检查网络或代理',WEB_ABORTED:'搜索已取消',TOOL_ABORTED:'工具已取消',TOOL_ABORTED_BEFORE_DISPATCH:'工具已取消'};
+export function runProgress({publish=()=>{},clock=Date.now,ttlMs=600000,maxEntries=100}={}){
+ const rows=new Map();let revision=0;
+ const trim=()=>{for(const [id,row] of rows)if(row.status!=='RUNNING'&&clock()-Date.parse(row.updated_at)>ttlMs)rows.delete(id);while(rows.size>maxEntries)rows.delete(rows.keys().next().value);};
+ const send=row=>{row.updated_at=new Date(clock()).toISOString();row.revision=++revision;publish(structuredClone(row));};
+ function start(run){trim();const row={run_id:run.runId,job_id:run.job.id,conversation_id:run.job.conversation_id,reply_to:run.job.message_id,harness:run.harness,status:'RUNNING',phase:'preparing',label:phases.preparing,model:'',started_at:new Date(clock()).toISOString(),last_activity_at:new Date(clock()).toISOString(),tools:[],sequence:0};rows.set(run.runId,row);send(row);}
+ function phase(runId,value,model){const row=rows.get(runId);if(!row||row.status!=='RUNNING'||!phases[value])return;row.phase=value;row.label=phases[value];if(model)row.model=String(model).slice(0,150);row.last_activity_at=new Date(clock()).toISOString();send(row);}
+ function update(run,event){const row=rows.get(run.runId);if(!row||row.status!=='RUNNING'||!Number.isSafeInteger(event.sequence)||event.sequence<=row.sequence)return false;row.sequence=event.sequence;
+  if(event.kind==='phase'){if(['waiting','reasoning','generating','reply'].includes(event.phase))phase(run.runId,event.phase);return true;}
+  const name=String(event.name||'').replace(/^mcp__teacher_job__/,''),allowed=name.startsWith('teacher_')||['web_search','web_fetch'].includes(name);
+  if(!allowed||name.length>100||typeof event.call_id!=='string'||event.call_id.length>200||!['tool_start','tool_end'].includes(event.kind))return false;
+  let tool=row.tools.find(t=>t.call_id===event.call_id);if(!tool){if(row.tools.length>=30)row.tools.shift();tool={call_id:event.call_id,name,label:labels[name]||'处理学习任务',status:'RUNNING',started_at:new Date(clock()).toISOString()};row.tools.push(tool);}
+  if(event.kind==='tool_end'){tool.status=event.failed?'FAILED':'COMPLETED';tool.ended_at=new Date(clock()).toISOString();if(event.failed)tool.error=errors[event.code]||'工具未完成，请查看回复中的处理说明';}
+  row.last_activity_at=new Date(clock()).toISOString();row.phase=event.kind==='tool_start'?'tool':'waiting';row.label=event.kind==='tool_start'?tool.label:'工具已返回，等待模型继续';send(row);return true;
+ }
+ function finish(runId,status){const row=rows.get(runId);if(!row||row.status!=='RUNNING')return;row.status=status;row.phase=status==='COMPLETED'?'completed':status==='CANCELLED'?'cancelled':'failed';row.label=phases[row.phase];row.ended_at=new Date(clock()).toISOString();for(const tool of row.tools)if(tool.status==='RUNNING'){tool.status=status==='CANCELLED'?'CANCELLED':'INTERRUPTED';tool.ended_at=row.ended_at;}send(row);trim();}
+ return {start,phase,update,finish,list:()=>{trim();return [...rows.values()].map(row=>structuredClone(row));}};
+}

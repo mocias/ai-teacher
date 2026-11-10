@@ -1,0 +1,83 @@
+const assert=require('node:assert/strict');
+const {mkdirSync,writeFileSync}=require('node:fs');
+const {join}=require('node:path');
+exports.run=async(main,base)=>{
+ const exec=code=>main.webContents.executeJavaScript(code);
+ const command=(action,args={})=>exec(`window.teacherDesktop.command(${JSON.stringify(action)},${JSON.stringify(args)})`);
+ const api=(path,data)=>exec(`fetch('/api/'+${JSON.stringify(path)},${data===undefined?'{}':`{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(${JSON.stringify(data)})}`}).then(async r=>{const value=await r.json();if(!r.ok)throw Error(value.error);return value;})`);
+ async function until(fn,label){const end=Date.now()+25000;while(Date.now()<end){try{const value=await fn();if(value)return value;}catch{}await new Promise(r=>setTimeout(r,75));}throw Error('等待超时：'+label);}
+ main.show();main.focus();
+ await api('agents/configure',{role:'reading',mode:'UNCONFIGURED'});
+ const passage='Persistent reading passage for tool pane verification.';
+ const resource=await api('resources',{title:'阅读工具分区测试',file:{name:'tools.md',base64:Buffer.from('# Tools chapter\n\n'+passage).toString('base64')}});
+ await exec(`window.teacherDesktop.openReader(${JSON.stringify(resource.id)})`);
+ let frame=await until(()=>main.webContents.mainFrame.frames.find(f=>f.url.includes('/reader.html')),'阅读器框架');
+ const ui=code=>frame.executeJavaScript(code);
+ await until(async()=>{const snapshot=await command('snapshot');return snapshot?.content?.includes(passage);},'真实正文');
+ await until(()=>ui(`document.querySelector('#reading-title').textContent.includes('分区测试')`),'阅读侧栏');
+ const view=await until(()=>main.contentView.children.find(v=>v.webContents?.getURL().includes(resource.id)),'原生正文');
+ if(await ui(`document.querySelector('#reader-side').hidden`))await ui(`document.querySelector('#reader-side-toggle').click()`);
+ const pane=name=>ui(`document.querySelector('#reader-tab-${name}').click()`);
+ await pane('chat');
+ await ui(`document.querySelector('#question').value='实际保存的阅读问题';document.querySelector('#ask-form').requestSubmit()`);
+ await until(()=>ui(`document.querySelector('#messages').textContent.includes('实际保存的阅读问题')&&!document.querySelector('#send').disabled`),'真实问题持久化');
+ await ui(`window.__toolNodes=['question','ask-form','messages','selection','annotations','goal','note-text'].map(id=>{const node=document.getElementById(id),parents=[];for(let p=node.parentNode;p;p=p.parentNode)parents.push(p);return {id,node,parents};});window.__toolWrites=[];window.__toolFetch=window.fetch;window.fetch=function(input,options){if(options?.method&&options.method!=='GET')__toolWrites.push({path:String(input),body:options.body});return __toolFetch.apply(this,arguments);};document.querySelector('#question').value='未发送的草稿';document.querySelector('#question').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#note-text').value='未保存笔记';document.querySelector('#selection').textContent='保留的提问引用';`);
+ const before=await api('state');
+ for(const name of ['marks','goals','chat','goals','marks']){
+  await pane(name);
+  assert.ok(await ui(`document.querySelector('#reader-tab-${name}').getAttribute('aria-selected')==='true'&&!document.querySelector('#reader-pane-${name}').hidden`));
+  assert.ok(await ui(`!document.querySelector('.mark-actions').closest('[role=tabpanel]')&&[...document.querySelectorAll('.mark-actions button')].every(b=>b.getBoundingClientRect().width>0)`),'所有工具页可标记');
+  assert.ok(await ui(`!document.querySelector('#reader-network').closest('[role=tabpanel]')`),'网络位于公共区');
+ }
+ assert.equal(await ui('__toolWrites.length'),0,'只切工具页不写后端');
+ assert.ok(await ui(`__toolNodes.every(({id,node,parents})=>{let p=node.parentNode;return document.getElementById(id)===node&&parents.every(old=>{const same=p===old;p=p?.parentNode;return same;});})`),'输入与其全部祖先均原样保留');
+ assert.deepEqual(await ui(`['question','note-text'].map(id=>document.getElementById(id).value).concat(document.querySelector('#selection').textContent)`),['未发送的草稿','未保存笔记','保留的提问引用']);
+ assert.ok(await ui(`!document.querySelector('#reader-job-summary').hidden`),'隐藏答疑页仍显示处理状态');
+ await ui(`document.querySelector('#reader-job-summary').click()`);
+ assert.ok(await ui(`!document.querySelector('#reader-pane-chat').hidden&&document.activeElement.id==='question'`));
+ assert.ok(await ui(`document.querySelector('#reader-job-summary').hidden`),'答疑页已有状态卡片时不重复显示摘要');
+ await pane('goals');await ui(`document.querySelector('#reader-network-status').click()`);
+ assert.ok(await ui(`document.querySelector('#reader-network').open&&document.activeElement===document.querySelector('#reader-network summary')&&!document.querySelector('#reader-pane-goals').hidden`),'网络入口不改变工具页');
+ await pane('chat');
+ await ui(`document.querySelector('#reader-tab-chat').focus();document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));`);
+ assert.equal(await ui('document.activeElement.id'),'reader-tab-marks');
+ await ui(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}));`);
+ assert.equal(await ui('document.activeElement.id'),'reader-tab-goals');
+ await ui(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));`);
+ assert.equal(await ui('document.activeElement.id'),'reader-tab-chat');
+ await ui(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));`);
+ assert.equal(await ui('document.activeElement.id'),'reader-tab-goals');
+ await ui(`(()=>{const original=Storage.prototype.setItem;try{Storage.prototype.setItem=()=>{throw Error('unavailable')};document.querySelector('#reader-tab-marks').click();}finally{Storage.prototype.setItem=original;}})()`);
+ assert.ok(await ui(`!document.querySelector('#reader-pane-marks').hidden`),'存储不可用仍切换');
+ // Exercise the real native selection and unchanged annotation endpoint in another pane.
+ await view.webContents.executeJavaScript(`(()=>{const p=[...document.querySelectorAll('p')].find(p=>p.textContent===${JSON.stringify(passage)}),r=document.createRange();r.selectNodeContents(p);getSelection().removeAllRanges();getSelection().addRange(r);})()`);
+ assert.equal(await command('selection'),passage,'真实选中目标正文');
+ await pane('goals');await ui(`document.querySelector('#highlight').click()`);
+ await until(async()=>{const rows=await api('reading-annotations?id='+encodeURIComponent(resource.id));return rows.some(a=>a.quote===passage&&a.kind==='highlight');},'真实高亮持久化');
+ await pane('marks');await until(()=>ui(`document.querySelector('#annotations').textContent.includes(${JSON.stringify(passage)})`),'标记页可见保存结果');
+ await pane('goals');await ui(`document.querySelector('#select-ask').click()`);
+ await until(()=>ui(`document.querySelector('#selection').textContent===${JSON.stringify(passage)}&&document.activeElement.id==='question'&&!document.querySelector('#reader-pane-chat').hidden`),'选文提问自动切回答疑');
+ await pane('marks');await ui(`document.querySelector('#reader-side-toggle').click()`);
+ const tabId=await ui(`document.querySelector('[data-tab].active').dataset.tab`);
+ main.webContents.send('reader:selection',{tabId,text:passage});
+ await until(()=>ui(`!document.querySelector('#reader-side').hidden&&!document.querySelector('#reader-pane-chat').hidden&&document.activeElement.id==='question'`),'右键提问展开并聚焦');
+ await pane('goals');await pane('marks');await pane('chat');
+ await ui(`document.querySelector('#question').value='切换后带引用的真实提问';document.querySelector('#question').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#ask-form').requestSubmit()`);
+ await until(()=>ui(`document.querySelector('#messages').textContent.includes('切换后带引用的真实提问')&&!document.querySelector('#send').disabled`),'切换后真实提问');
+ const writes=await ui('__toolWrites');
+ const ask=writes.find(r=>r.path.endsWith('/study/ask'));assert.equal(JSON.parse(ask.body).selection,passage);
+ const after=await api('state');assert.equal(after.evidence.length,before.evidence.length,'显示切换未制造掌握证据');
+ const cid=after.study.chats.find(c=>c.resource_id===resource.id).conversation_id;
+ assert.equal((await api('messages?conversation_id='+encodeURIComponent(cid))).filter(m=>m.role==='user').length,2);
+ const output=process.env.TEACHER_SMOKE_OUTPUT;mkdirSync(output,{recursive:true});
+ for(const name of ['chat','marks','goals']){
+  await pane(name);await ui(`document.querySelector('#reader-tab-${name}').focus();document.querySelector('#reader-side').scrollTop=0;new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  writeFileSync(join(output,'reader-tools-'+name+'.png'),(await main.webContents.capturePage()).toPNG());
+ }
+ writeFileSync(join(output,'reader-tools-content.png'),(await view.webContents.capturePage()).toPNG());
+ await pane('marks');await ui('location.reload()');
+ frame=await until(()=>main.webContents.mainFrame.frames.find(f=>f.url.includes('/reader.html')),'重载框架');
+ await until(()=>ui(`document.querySelector('#reader-tab-marks')?.getAttribute('aria-selected')==='true'`),'恢复工具偏好');
+ const result={persistentNodesAndAncestry:true,noWritesOnTabSwitch:true,quoteAndDraftPreserved:true,realAnnotation:true,realQuestions:2,sharedNetwork:true,sharedJobStatus:true,keyboardArrowsHomeEnd:true,contextMenuFocus:true,selectionFocus:true,preferenceRestored:true,storageFailureTolerated:true};
+ writeFileSync(join(output,'reader-tools-result.json'),JSON.stringify(result,null,2));console.log('READER_TOOLS_SMOKE_OK '+JSON.stringify(result));
+};

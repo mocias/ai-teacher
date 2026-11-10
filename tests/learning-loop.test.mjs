@@ -26,8 +26,9 @@ test('resource becomes a formal goal atomically, preserves original material and
  const before=s.overview(),a={resource_id:r.id,goal:{title:'学习缓存',domain:'计算机',scope:'原理与应用'},role:'PRIMARY',request_id:id()};
  assert.throws(()=>s.attachResource({...a,goal:{title:'',domain:'计算机'}}));assert.equal(s.overview().goals.length,0);
  const linked=s.attachResource(a);assert.deepEqual(s.attachResource(a),linked);assert.equal(s.overview().goals.length,1);assert.equal(s.overview().resources.length,1);
- assert.deepEqual(s.overview().learning.material_contents,before.learning.material_contents);assert.equal(s.study.open({resource_id:r.id}).conversation_id,reading.conversation_id);assert.equal(s.study.annotations(r.id)[0].note,'自己的理解');assert.equal(s.overview().evidence.length,0);
- assert.throws(()=>s.attachResource({...a,request_id:id()}),/已有正式目标/);
+ const bodyFields=({id,resource_id,scope,hash,created_at,characters})=>({id,resource_id,scope,hash,created_at,characters});const savedBodies=s.overview().learning.material_contents.map(bodyFields);assert.deepEqual(savedBodies,before.learning.material_contents.map(bodyFields));assert.equal(s.study.open({resource_id:r.id}).conversation_id,reading.conversation_id);assert.equal(s.study.annotations(r.id)[0].note,'自己的理解');assert.equal(s.overview().evidence.length,0);
+ const shared=s.attachResource({...a,goal:{title:'缓存参考',domain:'计算机'},role:'REFERENCE',request_id:id()});
+ assert.notEqual(shared.goal_id,linked.goal_id);assert.equal(s.goalResources.get(shared.goal_id,r.id).role,'REFERENCE');assert.equal(s.goalResources.get(linked.goal_id,r.id).role,'PRIMARY');assert.equal(s.overview().resources.find(row=>row.id===r.id).goal_id,linked.goal_id);
  s.db.close();s=createStore(file);assert.equal(s.overview().resources[0].goal_id,linked.goal_id);assert.equal(s.study.state().progress[0].location,'缓存');assert.deepEqual(Buffer.from(s.db.prepare('SELECT content FROM resource_files WHERE resource_id=?').get(r.id).content),bytes);
  const second=s.resource({title:'另一个资料'}),{g}=route(s);s.setGoalStatus(g,'PAUSED');assert.throws(()=>s.attachResource({resource_id:second.id,goal_id:g,role:'REFERENCE',request_id:id()}),/进行中/);assert.equal(s.overview().resources.find(r=>r.id===second.id).goal_id,null);
 });
@@ -47,6 +48,7 @@ test('stale preview, changed parameters, invalid budget and obsolete capability 
  const fresh=s.calendar.preview(a);assert.throws(()=>s.calendar.batch({...a,daily_minutes:90,fingerprint:fresh.fingerprint,request_id:id()}),/已变化/);assert.deepEqual(s.calendar.state(),before);
  for(const invalid of [{start_date:'2026-02-30'},{weekdays:[]},{weekdays:[7]},{session_minutes:61},{daily_minutes:0}])assert.throws(()=>s.calendar.preview({...a,...invalid}));
  const cap=s.learning.proposeCapabilities({goal_id:g,items:[{title:'新要求',kind:'CORE',requirements:[{node:'新知识',description:'解释新知识'}]}],request_id:id()});s.learning.confirmCapabilities({id:cap.proposal_id,accept:true});assert.throws(()=>s.calendar.preview(a),/新版路线/);assert.deepEqual(s.calendar.state(),before);
+ assert.equal(s.rollingPlan.state(g).queue.length,0);assert.throws(()=>s.rollingPlan.assertExecutable(s.overview().sessions[0].id),/新版路线/);
 });
 
 test('rescheduling a prerequisite cannot place it after an existing successor; failed batch rolls back all entries',t=>{

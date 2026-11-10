@@ -29,6 +29,10 @@ export function agentService(db,file,{models,receipt,leased}){
   db.exec('CREATE TABLE IF NOT EXISTS harness_runs(id TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES jobs(id),role TEXT NOT NULL,harness TEXT NOT NULL,status TEXT NOT NULL,error TEXT,tool_calls INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,ended_at TEXT)');
   const dshSessions=dshSessionService(db,file);
   const dshModels=dshModelPreferences(db,file);
+  if(!one("SELECT name FROM sqlite_master WHERE name='agent_configuration_changes'")){
+   if(file!==':memory:'){mkdirSync(join(dirname(file),'backups'),{recursive:true});db.prepare('VACUUM INTO ?').run(join(dirname(file),'backups','before-direct-configuration-'+Date.now()+'.sqlite'));}
+   db.exec('CREATE TABLE agent_configuration_changes(id TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES jobs(id),summary TEXT NOT NULL,before_routes TEXT NOT NULL,after_routes TEXT NOT NULL,revision INTEGER NOT NULL,created_at TEXT NOT NULL,reverted_at TEXT)');
+  }
   const roleOK=role=>{if(role!=='master'&&!Object.hasOwn(modules,role))fail('Agent 模块无效');};
  const settings=()=>one('SELECT enabled,revision FROM agent_settings');
  function route(role){
@@ -37,7 +41,8 @@ export function agentService(db,file,{models,receipt,leased}){
   const legacy=role!=='master'?one('SELECT profile_id FROM model_routes WHERE module=?',role):null;
   return {role,mode:legacy?.profile_id?'API':'UNCONFIGURED',profile_id:legacy?.profile_id||null,harness:'MANUAL',executable:'',model:'',has_token:0};
  }
- function state(){return {...settings(),modules,dsh_workspace:dshSessions.workspace(dirname(file)),dsh_sessions:dshSessions.state(),dsh_conversation_models:dshModels.state(),routes:['master',...Object.keys(modules)].map(route),runs:all('SELECT r.*,m.provider AS model_provider,m.model AS model_name,m.source AS model_source FROM harness_runs r LEFT JOIN dsh_run_models m ON m.run_id=r.id ORDER BY r.rowid DESC LIMIT 100'),proposals:all("SELECT * FROM agent_proposals WHERE status='PENDING' ORDER BY rowid DESC").map(p=>({...p,plan:JSON.parse(p.plan)}))};}
+ function configurationChanges(){return all('SELECT * FROM agent_configuration_changes ORDER BY rowid DESC LIMIT 20').map(row=>({...row,before_routes:JSON.parse(row.before_routes),after_routes:JSON.parse(row.after_routes),can_undo:!row.reverted_at&&row.revision===settings().revision}));}
+ function state(){return {...settings(),modules,configuration_changes:configurationChanges(),dsh_workspace:dshSessions.workspace(dirname(file)),dsh_sessions:dshSessions.state(),dsh_conversation_models:dshModels.state(),routes:['master',...Object.keys(modules)].map(route),runs:all('SELECT r.*,m.provider AS model_provider,m.model AS model_name,m.source AS model_source FROM harness_runs r LEFT JOIN dsh_run_models m ON m.run_id=r.id ORDER BY r.rowid DESC LIMIT 100'),proposals:all("SELECT * FROM agent_proposals WHERE status='PENDING' ORDER BY rowid DESC").map(p=>({...p,plan:JSON.parse(p.plan)}))};}
  function validateRoute(r){roleOK(r.role);if(!['API','MCP','UNCONFIGURED'].includes(r.mode)||(r.role==='master'&&r.mode==='UNCONFIGURED'))fail('Agent 执行方式无效');if(r.mode==='API')models.profile(r.profile_id);const harness=r.mode==='MCP'?(r.harness||'MANUAL'):'MANUAL';if(!['MANUAL','CODEX','CLAUDE','DSH'].includes(harness))fail('宿主类型无效');const executable=r.mode==='MCP'?String(r.executable||'').trim():'',model=r.mode==='MCP'?String(r.model||'').trim():'';if(executable.length>500||/[\r\n]/.test(executable)||model.length>150||/[\r\n]/.test(model))fail('宿主配置无效');return {role:r.role,mode:r.mode,profile_id:r.mode==='API'?r.profile_id:null,harness,executable,model};}
  function put(r){r=validateRoute(r);run('INSERT INTO agent_routes(role,mode,profile_id,harness,executable,model) VALUES(?,?,?,?,?,?) ON CONFLICT(role) DO UPDATE SET mode=excluded.mode,profile_id=excluded.profile_id,harness=excluded.harness,executable=excluded.executable,model=excluded.model,token_hash=CASE WHEN excluded.mode=agent_routes.mode AND excluded.harness=agent_routes.harness THEN agent_routes.token_hash ELSE NULL END,last_seen=CASE WHEN excluded.mode=agent_routes.mode AND excluded.harness=agent_routes.harness THEN agent_routes.last_seen ELSE NULL END',r.role,r.mode,r.profile_id,r.harness,r.executable,r.model);}
  function configure(a){const r=validateRoute(a);put(r);run('UPDATE agent_settings SET enabled=1');run('UPDATE agent_settings SET revision=revision+1');if(r.mode==='API')models.enabled(true);return state();}
@@ -50,13 +55,37 @@ export function agentService(db,file,{models,receipt,leased}){
   dshModels.freeze(job,r);
   return {mode:r.mode,profile_id:r.profile_id,agent_role:role,blocked:r.mode==='UNCONFIGURED'?1:0};
  }
- function configuration(){const s=state();return {revision:s.revision,modules,routes:s.routes,dsh_models:dshModels.catalog(),profiles:models.state().profiles.map(({id,name,model,base_url,has_key})=>({id,name,model,base_url,has_key})),pending:s.proposals,prompt:guidePrompt};}
+ function configuration(){const s=state();return {revision:s.revision,modules,routes:s.routes,dsh_models:dshModels.catalog(),profiles:models.state().profiles.map(({id,name,model,base_url,has_key})=>({id,name,model,base_url,has_key})),pending:s.proposals,direct_configuration:{tool:'teacher_set_agent_configuration',supported:true,scope:'各功能的宿主、DSH 目录模型和已有 API 连接；不能修改主 Agent 自身、密钥或可执行文件路径'},configuration_changes:s.configuration_changes,prompt:guidePrompt};}
  function master(a){const job=leased(a.job_id,a.lease_token),task=one('SELECT * FROM job_execution WHERE job_id=?',job.id);if(task?.agent_role!=='master'||one('SELECT kind FROM conversations WHERE id=?',job.conversation_id)?.kind!=='ORCHESTRATION')fail('仅配置引导对话中的主 Agent 可修改配置提案');return {job,task};}
  function normalizePlan(plan){
   if(!plan||!Array.isArray(plan.routes)||plan.routes.length>Object.keys(modules).length)fail('分工方案无效');
   const seen=new Set();return {routes:plan.routes.map(r=>{if(r.role==='master'||seen.has(r.role))fail('模块重复或不可修改主 Agent');seen.add(r.role);roleOK(r.role);if(r.connection){if(r.mode!=='API')fail('模型连接仅用于 API');const c=r.connection;if(typeof c.name!=='string'||!c.name.trim()||c.name.length>200||typeof c.model!=='string'||!c.model.trim()||c.model.length>200)fail('连接名称或模型名无效');return {role:r.role,mode:'API',connection:{name:c.name.trim(),model:c.model.trim(),base_url:normalizeBase(c.base_url)}};}const route=validateRoute(r);if(route.harness==='DSH'&&route.model)dshModels.validate(route.model);return route;})};
  }
  function propose(a){const {job}=master(a);if(a.revision!==settings().revision)fail('配置已变化，请重新读取');const plan=normalizePlan(a.plan);return receipt(a.request_id,'agent-plan:'+job.id,()=>{const id=randomUUID();run('INSERT INTO agent_proposals VALUES(?,?,?,?,?,?,?)',id,job.conversation_id,a.revision,a.summary,JSON.stringify(plan),'PENDING',now());return {id,status:'PENDING'};});}
+ function idleRoutes(routes){for(const r of routes){if(one("SELECT 1 FROM jobs j JOIN job_execution e ON e.job_id=j.id WHERE j.status='RUNNING' AND e.agent_role=?",r.role)||one("SELECT 1 FROM harness_runs WHERE role=? AND status='RUNNING'",r.role)||one("SELECT 1 FROM model_runs r JOIN job_execution e ON e.job_id=r.job_id WHERE e.agent_role=? AND r.status='RUNNING'",r.role))fail(modules[r.role]+' 仍有执行中的任务，请等待完成后再设置');}}
+ function setConfiguration(a){const {job}=master(a);return receipt(a.request_id,'agent-set:'+job.id,()=>{
+  if(a.revision!==settings().revision)fail('配置已变化，请重新读取');
+  if(!Array.isArray(a.routes)||!a.routes.length||a.routes.some(r=>r.connection||r.executable!==undefined))fail('直接设置仅使用已有连接，不接受新连接、密钥或可执行文件路径');
+  const plan=normalizePlan({routes:a.routes});const before=plan.routes.map(r=>validateRoute(route(r.role)));
+  const after=plan.routes.map(r=>{
+   if(r.mode==='MCP'){
+    const old=route(r.role),existing=['master',...Object.keys(modules)].map(route).find(v=>v.mode==='MCP'&&v.harness===r.harness);
+    r.executable=old.mode==='MCP'&&old.harness===r.harness?old.executable:existing?.executable||'';
+    if(r.harness==='DSH'){const catalog=dshModels.catalog();if(catalog.error)fail(catalog.error);r.model=r.model||catalog.default_model||'';if(!r.model)fail('DSH 没有可用默认模型，请先读取模型目录');dshModels.validate(r.model);}
+   }return r;
+  });idleRoutes(after);
+  for(const r of after)put(r);run('UPDATE agent_settings SET enabled=1,revision=revision+1');
+  if(after.some(r=>r.mode==='API'))models.enabled(true);
+  run("UPDATE agent_proposals SET status='SUPERSEDED' WHERE status='PENDING'");
+  const change_id=randomUUID(),revision=settings().revision;
+  run('INSERT INTO agent_configuration_changes VALUES(?,?,?,?,?,?,?,NULL)',change_id,job.id,a.summary,JSON.stringify(before),JSON.stringify(after),revision,now());
+  return {status:'APPLIED',change_id,revision,routes:after,effective:'配置已生效，后续任务使用新配置；正在等待的旧任务需显式重试，对话独立模型选择保持不变'};
+ });}
+ function undoConfiguration(a){return receipt(a.request_id,'agent-undo:'+a.id,()=>{
+  const change=one('SELECT * FROM agent_configuration_changes WHERE id=?',a.id);if(!change||change.reverted_at)fail('该变更不存在或已撤销');if(change.revision!==settings().revision)fail('配置在此后发生过变化，不能覆盖新的设置');
+  const before=JSON.parse(change.before_routes);idleRoutes(before);for(const r of before)put(r);run('UPDATE agent_settings SET revision=revision+1');run('UPDATE agent_configuration_changes SET reverted_at=? WHERE id=?',now(),a.id);
+  return {status:'REVERTED',revision:settings().revision};
+ });}
  function decide(a){
   if(typeof a.accept!=='boolean')fail('确认值无效');
   return receipt(a.request_id,'agent-decide:'+a.id,()=>{
@@ -93,5 +122,5 @@ export function agentService(db,file,{models,receipt,leased}){
   }catch(e){db.exec('ROLLBACK');throw e;}
  }
 
- return {state,route,configure,token,authenticate,resolve,enabled:()=>!!settings().enabled,configuration,master,propose,decide,conversation,retry,dshSessions,dshModels};
+ return {state,route,configure,token,authenticate,resolve,enabled:()=>!!settings().enabled,configuration,master,propose,setConfiguration,undoConfiguration,decide,conversation,retry,dshSessions,dshModels};
 }

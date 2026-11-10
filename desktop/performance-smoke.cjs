@@ -13,7 +13,7 @@ exports.run=async(main,base)=>{
  main.webContents.debugger.on('message',record);await main.webContents.debugger.sendCommand('Network.enable');
  await main.webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
  try{
-  await main.loadURL(base);await until(()=>exec(`!!document.querySelector('#discovery-input')`),'homepage');
+  await main.loadURL(base+'/?home_chat=discovery');await until(()=>exec(`!!document.querySelector('#discovery-input')`),'homepage');
   await new Promise(r=>setTimeout(r,300));
   const startup=requests.slice();assert.equal(startup.filter(p=>p==='/api/events').length,1,'only one SSE connection per document');assert.equal(startup.filter(p=>p==='/api/state').length,1);assert.equal(startup.filter(p=>p==='/api/messages').length,1);
   await exec(`window.keptComposer=document.querySelector('#discovery-input');window.keptComposer.value='等待时保留草稿';window.keptComposer.focus();window.keptComposer.setSelectionRange(2,5);`);

@@ -31,6 +31,24 @@ exports.run=async(main,base)=>{
  const pick=async(run=exec)=>{await until(()=>run(`!!document.querySelector('.dsh-model-picker select option[value="local-picker/smart/two"]')`),'choices visible');await run(`(()=>{const select=document.querySelector('.dsh-model-picker select');select.value='local-picker/smart/two';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);await until(()=>run(`!!document.querySelector('.dsh-model-picker select:not(:disabled)')&&document.querySelector('.dsh-model-picker select').value==='local-picker/smart/two'`),'selection retained');};
  await main.loadURL(base+'/agents.html');await pick();const master=await post('agents/conversation',{});
  await main.loadURL(base);await pick();
+ // Deliver the same cached, refreshing catalog a page receives during background discovery.
+ await exec(`(async()=>{window.pickerSnapshot=await fetch('/api/agents/dsh-models').then(r=>r.json());window.quietCatalogEvent=detail=>window.dispatchEvent(new CustomEvent('dsh-model-catalog',{detail}));quietCatalogEvent({...pickerSnapshot,refreshing:true,diagnostics:[],error:null});return true;})()`);
+ for(let i=0;i<3;i++){
+  assert.equal(await exec(`!!document.querySelector('.dsh-model-picker .picker-notice')`),false,'passive refresh of usable models must not pop over the composer');
+  assert.equal(await exec(`document.querySelector('.dsh-model-picker select').value`),'local-picker/smart/two');
+  await exec(`window.dispatchEvent(new Event('dsh-model-changed'));true`);
+  await new Promise(r=>setTimeout(r,200));
+ }
+ await exec(`quietCatalogEvent({...pickerSnapshot,error:'测试：模型目录不可用'});true`);
+ assert.match(await exec(`document.querySelector('.dsh-model-picker .picker-notice')?.textContent||''`),/模型目录不可用/);
+ await exec(`quietCatalogEvent({...pickerSnapshot,refreshing:true,diagnostics:[],error:null,models:[]});true`);
+ assert.equal(await exec(`document.querySelector('.dsh-model-picker .picker-loading')?.textContent`),'正在读取模型…');
+ await exec(`quietCatalogEvent(pickerSnapshot);true`);
+ await exec(`window.savedPickerFetch=window.fetch;window.refreshReply=null;window.fetch=(url,options)=>url==='/api/agents/dsh-models?refresh=1'?new Promise(resolve=>{window.refreshReply=()=>resolve(Response.json(pickerSnapshot));}):savedPickerFetch(url,options);document.querySelector('.dsh-model-picker button').click();true`);
+ await until(()=>exec(`!!window.refreshReply`),'manual force refresh');
+ assert.match(await exec(`document.querySelector('.dsh-model-picker .picker-notice')?.textContent||''`),/正在同步/);
+ await exec(`refreshReply();window.fetch=savedPickerFetch;true`);
+ await until(()=>exec(`!document.querySelector('.dsh-model-picker .picker-notice')`),'manual refresh finished');
  await exec(`document.querySelector('[data-view="chat"]').click()`);await pick();
  await main.loadURL(base+'/personal.html?conversation='+intro.conversation_id);await pick();
  await main.loadURL(base+'/?view=models');await until(()=>exec(`!!document.querySelector('[data-action="agent-configure"][data-id="chat"]')`),'settings');
@@ -45,7 +63,7 @@ exports.run=async(main,base)=>{
  main.setMinimumSize(360,500);await main.webContents.debugger.attach('1.3');
  try{await main.webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride',{width:420,height:760,deviceScaleFactor:1,mobile:false});await exec(`new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))`);assert.equal(await exec(`document.documentElement.scrollWidth>innerWidth`),false);assert.ok(await exec(`document.querySelector('#send').getBoundingClientRect().bottom<=innerHeight`));}
  finally{await main.webContents.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');main.webContents.debugger.detach();}
- const result={master:true,discovery:true,teacher:true,onboarding:true,reader:true,functionDefaults:true,reloadPersisted:true,narrowComposerVisible:true,noModelRequests:true};
+ const result={quietBackgroundRefresh:true,coldLoadInline:true,manualRefreshVisible:true,errorsVisible:true,master:true,discovery:true,teacher:true,onboarding:true,reader:true,functionDefaults:true,reloadPersisted:true,narrowComposerVisible:true,noModelRequests:true};
  if(process.env.TEACHER_SMOKE_OUTPUT)writeFileSync(join(process.env.TEACHER_SMOKE_OUTPUT,'model-picker-result.json'),JSON.stringify(result,null,2));
  console.log('MODEL_PICKER_SMOKE_OK '+JSON.stringify(result));
 };

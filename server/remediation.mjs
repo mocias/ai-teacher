@@ -28,7 +28,7 @@ export function remediationService(db,file,{receipt,calendar}){
   if(typeof a.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(a.date)||!Number.isFinite(Date.parse(a.date))||new Date(a.date).toISOString().slice(0,10)!==a.date)fail('补学日期无效');
   if(!Number.isInteger(a.duration)||a.duration<1||a.duration>240)fail('补学时长需为 1–240 分钟');
   if(typeof a.activity!=='string'||!a.activity.trim()||a.activity.length>5000)fail('请填写具体补学内容（最多 5000 字）');
-  if(!Array.isArray(a.resource_ids)||a.resource_ids.length>50||a.resource_ids.some(id=>typeof id!=='string'||!one('SELECT id FROM resources WHERE id=? AND goal_id=?',id,goal.id)))fail('补学资料必须属于当前目标（最多 50 份）');
+  if(!Array.isArray(a.resource_ids)||a.resource_ids.length>50||a.resource_ids.some(id=>typeof id!=='string'||!one('SELECT resource_id FROM goal_resources WHERE resource_id=? AND goal_id=?',id,goal.id)))fail('补学资料必须属于当前目标（最多 50 份）');
   const existing=one('SELECT c.id,c.date FROM calendar_entries c JOIN remediation_tasks t ON t.entry_id=c.id WHERE t.gap_id=? AND c.cancelled=0 AND c.done=0',gap.id);
   if(existing)return {id:existing.id,date:existing.date,reused:true};
   const entry=calendar.save({title:('补学：'+gap.description).slice(0,200),date:a.date,duration:a.duration});

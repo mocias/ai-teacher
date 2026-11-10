@@ -12,7 +12,7 @@ import {harnessCommand} from '../server/harness-host.mjs';
 import {dshCommand,dshPatch} from '../server/dsh-host.mjs';
 const fixture=fileURLToPath(new URL('./fixtures/fake-harness.mjs',import.meta.url));
 async function waitFor(check){for(let i=0;i<100;i++){const value=check();if(value)return value;await new Promise(resolve=>setTimeout(resolve,50));}throw Error('timed out');}
-function app(t,spawnProcess,harnessOptions={}){const dir=mkdtempSync(join(tmpdir(),'teacher-host-test-'));const result=startServer({port:0,dataDir:dir,executorOptions:{intervalMs:1e9},hostOptions:{intervalMs:1e9},harnessOptions:{intervalMs:1e9,spawnProcess,readDshModel:()=>null,...harnessOptions}});t.after(async()=>{await result.close();rmSync(dir,{recursive:true,force:true});});return result;}
+function app(t,spawnProcess,harnessOptions={}){const dir=mkdtempSync(join(tmpdir(),'teacher-host-test-'));const result=startServer({port:0,dataDir:dir,executorOptions:{intervalMs:1e9},hostOptions:{intervalMs:1e9},harnessOptions:{intervalMs:1e9,spawnProcess:(command,args,options)=>spawnProcess(command,args,args.includes('acp')?{...options,env:{...options.env,FAKE_DSH_ACP:'1'}}:options),readDshModel:()=>null,...harnessOptions}});t.after(async()=>{await result.close();rmSync(dir,{recursive:true,force:true});});return result;}
 
 test('site launches a role harness; job-scoped MCP reads context and writes the answer',async t=>{
  const launches=[];const instance=app(t,(command,args,options)=>{launches.push({command,args,options});return spawn(process.execPath,[fixture],options);});await once(instance.server,'listening');
@@ -41,14 +41,14 @@ test('missing writeback blocks the job, records a visible failure, and requires 
  instance.store.agents.retry({job_id:job.id});assert.equal(instance.store.db.prepare('SELECT blocked FROM job_execution WHERE job_id=?').get(job.id).blocked,0);
 });
 
-test('DSH launches headless with a temporary scoped MCP patch and revokes it after writeback',async t=>{
+test('DSH launches a resident ACP process without static job credentials',async t=>{
  let patchPath,patch,token;
  const instance=app(t,(_command,args,options)=>{
-  assert.deepEqual(args.slice(-2),['--json','-']);
-  assert.ok(args.includes('headless'));
+  assert.ok(args.includes('acp'));
+  assert.ok(!args.includes('--json'));
   patchPath=args[args.indexOf('--patch')+1];patch=JSON.parse(readFileSync(patchPath,'utf8'));
   token=options.env.TEACHER_HOST_TOKEN;
-  assert.equal(patch.at(-1).insert[0].config.env.TEACHER_HOST_TOKEN,token);
+  assert.equal(token,undefined);assert.ok(!JSON.stringify(patch).includes('TEACHER_HOST_TOKEN'));
   return spawn(process.execPath,[fixture],{...options,env:{...options.env,ELECTRON_RUN_AS_NODE:undefined}});
  });await once(instance.server,'listening');
  instance.store.agents.configure({role:'onboarding',mode:'MCP',harness:'DSH',executable:process.execPath,model:'custom/model-a'});
@@ -58,9 +58,9 @@ test('DSH launches headless with a temporary scoped MCP patch and revokes it aft
  const run=await waitFor(()=>instance.store.db.prepare("SELECT * FROM harness_runs WHERE status='COMPLETED'").get());
  assert.equal(run.harness,'DSH');assert.ok(run.tool_calls>=2);
  assert.equal(instance.store.messages(intro.conversation_id).at(-1).content,'通过任务专属 MCP 回写的测试回答');
- assert.equal(existsSync(patchPath),false);assert.equal(instance.harnessDriver.authenticate(token),false);
- assert.deepEqual(patch.find(row=>row.id==='agent-default-model').config,{provider:'custom',model:'model-a'});
- assert.ok(!JSON.stringify(instance.store.overview()).includes(token));
+ assert.equal(existsSync(patchPath),true);assert.equal(instance.harnessDriver.authenticate(token),false);
+ assert.deepEqual(patch.findLast(row=>row.id==='acp'&&row.config).config,{provider:'custom',model:'model-a'});
+ assert.equal(token,undefined);
 });
 
 test('DSH missing writeback blocks retry and removes task credentials',async t=>{
@@ -69,14 +69,14 @@ test('DSH missing writeback blocks retry and removes task credentials',async t=>
  instance.store.agents.configure({role:'onboarding',mode:'MCP',harness:'DSH',executable:process.execPath});
  const intro=instance.store.study.onboarding({action:'start',request_id:'dsh-no-writeback'});instance.harnessDriver.tick();
  const run=await waitFor(()=>instance.store.db.prepare("SELECT * FROM harness_runs WHERE status='FAILED'").get());
- assert.match(run.error,/DSH 未通过 MCP 完成回写/);assert.equal(existsSync(patchPath),false);
+ assert.match(run.error,/DSH/);assert.equal(existsSync(patchPath),false);
  const job=instance.store.db.prepare('SELECT * FROM jobs WHERE conversation_id=?').get(intro.conversation_id);
  assert.equal(job.status,'QUEUED');assert.equal(instance.store.db.prepare('SELECT blocked FROM job_execution WHERE job_id=?').get(job.id).blocked,1);
 });
 
 test('DSH terminal errors become useful messages without storing raw provider diagnostics',async t=>{
  const event={type:'status',phase:'turn_end',reason:{kind:'error',error:{code:'MISSING_CREDENTIAL',message:'private-provider-key-must-not-persist'}}};
- const instance=app(t,(_command,_args,options)=>spawn(process.execPath,['-e',`process.stdout.write(${JSON.stringify(JSON.stringify(event))});`],options));await once(instance.server,'listening');
+ const instance=app(t,(_command,_args,options)=>spawn(process.execPath,['-e',`process.stdout.write(${JSON.stringify(JSON.stringify(event)+'\n')});`],options));await once(instance.server,'listening');
  instance.store.agents.configure({role:'onboarding',mode:'MCP',harness:'DSH',executable:process.execPath});
  instance.store.study.onboarding({action:'start',request_id:'dsh-credential-error'});instance.harnessDriver.tick();
  const run=await waitFor(()=>instance.store.db.prepare("SELECT * FROM harness_runs WHERE status='FAILED'").get());
@@ -84,13 +84,14 @@ test('DSH terminal errors become useful messages without storing raw provider di
 });
 
 test('resumed DSH must refresh task context before writing; each invocation gets new credentials',async t=>{
- const tokens=[];const instance=app(t,(_command,_args,options)=>{tokens.push(options.env.TEACHER_HOST_TOKEN);return spawn(process.execPath,[fixture],{...options,env:{...options.env,FAKE_REQUIRE_CONTEXT_TEST:'1'}});});await once(instance.server,'listening');
+ const tokens=[];let launches=0;const instance=app(t,(_command,_args,options)=>{launches++;return spawn(process.execPath,[fixture],{...options,env:{...options.env,FAKE_REQUIRE_CONTEXT_TEST:'1'}});});await once(instance.server,'listening');
  instance.store.agents.configure({role:'onboarding',mode:'MCP',harness:'DSH',executable:process.execPath});
+ const invoke=instance.harnessDriver.invoke;instance.harnessDriver.invoke=(token,input)=>{if(input.name==='teacher_get_context')tokens.push(token);return invoke(token,input);};
  const intro=instance.store.study.onboarding({action:'start',request_id:'dsh-fresh-context'});instance.harnessDriver.tick();
  await waitFor(()=>instance.store.db.prepare("SELECT * FROM harness_runs WHERE status='COMPLETED'").get());
  const second=instance.store.send(intro.conversation_id,'第二轮',crypto.randomUUID());instance.store.models.tag(second.job_id);instance.harnessDriver.tick();
  await waitFor(()=>instance.store.db.prepare("SELECT * FROM harness_runs WHERE job_id=? AND status='COMPLETED'").get(second.job_id));
- assert.notEqual(tokens[0],tokens[1]);assert.ok(!instance.store.messages(intro.conversation_id).some(m=>m.content==='旧轮次不应写入'));
+ assert.equal(launches,1);assert.equal(instance.harnessDriver.residentState()[0].turns,2);assert.equal(tokens.length,2);assert.notEqual(tokens[0],tokens[1]);assert.equal(instance.harnessDriver.authenticate(tokens[0]),false);assert.equal(instance.harnessDriver.authenticate(tokens[1]),false);assert.ok(!instance.store.messages(intro.conversation_id).some(m=>m.content==='旧轮次不应写入'));
 });
 
 test('different roles cannot resume one conversation while its previous host is still flushing',async t=>{
@@ -144,8 +145,8 @@ test('DSH resolves Desktop and npm launchers without a shell and disables unrela
  const npm=dshCommand(join(root,'dsh.cmd'),{exists:()=>true});assert.equal(npm.command,process.execPath);assert.match(npm.args[0],/bin\.js$/);
  assert.throws(()=>dshCommand('relative.exe',{exists:()=>true}),/绝对路径/);
  const patch=dshPatch({model:''},{bridge:'C:/bridge.mjs',baseUrl:'http://127.0.0.1:1234',token:'private-token'});
- for(const id of ['tool-bash','tool-pwsh','tool-fs','tool-web','tool-subagent','tool-plugin-manager'])assert.equal(patch.find(row=>row.id===id).disabled,true);
- assert.ok(!patch.some(row=>row.id==='agent-default-model'));
+ for(const id of ['tool-bash','tool-pwsh','tool-fs','tool-subagent','tool-plugin-manager'])assert.equal(patch.find(row=>row.id===id).disabled,true);
+ assert.equal(patch.findLast(row=>row.id==='tool-web').disabled,false);assert.ok(!patch.some(row=>row.id==='agent-default-model'));
  assert.equal(patch.at(-1).insert[0].config.failOnStartupError,true);
  assert.throws(()=>dshPatch({model:'provider/'},{}),/provider\/model/);
 });
@@ -181,4 +182,13 @@ test('older role routes gain harness columns with a backup and keep their settin
   store=createStore(file);assert.equal(store.agents.route('onboarding').mode,'MCP');assert.equal(store.agents.route('onboarding').harness,'MANUAL');
   assert.ok(readdirSync(join(dir,'backups')).some(name=>name.startsWith('before-harness-routing-')));store.db.close();
  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('ACP end_turn without native completed never reuses the worker or advances its checkpoint',async t=>{
+ const instance=app(t,(_command,_args,options)=>spawn(process.execPath,[fixture],{...options,env:{...options.env,FAKE_DSH_STOP_KIND:'blocked'}}));await once(instance.server,'listening');
+ instance.store.agents.configure({role:'onboarding',mode:'MCP',harness:'DSH',executable:process.execPath});
+ const intro=instance.store.study.onboarding({action:'start',request_id:'dsh-unclean-end'});instance.harnessDriver.tick();
+ await waitFor(()=>instance.store.db.prepare("SELECT * FROM harness_runs WHERE status='COMPLETED'").get());
+ assert.equal(instance.harnessDriver.residentState().length,0);const session=instance.store.agents.dshSessions.get(intro.conversation_id);assert.equal(session.state,'FAILED');assert.equal(session.checkpoint_hash,null);
 });

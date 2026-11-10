@@ -18,6 +18,12 @@ export function assessmentReport(state,id,{compact=false}={}){
  const o=assessmentOutcome(state,id);if(!o)return '';const {assessment:a,evidence,current,relations,gaps,canSchedule}=o;
  const summary=compact?String(a.summary||'').slice(0,160):a.summary;
  const home=button('journey-open','返回目标进度',a.goal_id);
+ const comment=state.learning.assessment_comments?.find(row=>row.assessment_id===a.id);
+ const task=state.models?.tasks?.find(row=>row.job_id===comment?.job_id);
+ const retry=comment?.status==='QUEUED'&&(task?.blocked||task?.mode==='UNCONFIGURED'||(task?.mode==='API'&&!state.models?.enabled));
+ const endedEarly=a.status==='ENDED_EARLY';
+ const commentStatus=endedEarly&&(comment?.status!=='COMPLETED')?(retry?'评语尚未生成，请检查模型配置后重试。':comment&&['QUEUED','RUNNING'].includes(comment.status)?'正在等待模型生成评语…':'尚无结束评语。'):'';
+ const actions=endedEarly?'<div class="row">'+(o.current&&!['COMPLETED','ABANDONED','PAUSED'].includes(state.goals.find(goal=>goal.id===a.goal_id)?.status)?button('assessment-continue','从上次继续',a.id):'')+(retry?button('assessment-comment-retry','重试评语',a.id):!comment||comment.status==='CANCELLED'?button('assessment-comment','补生成评语',a.id):'')+'</div>':'';
  let content='<div class="row">'+button('v2-results','查看结果与下一步',a.id)+home+'</div>';
  if(!compact){
   const rows=relations.map(r=>{
@@ -29,7 +35,7 @@ export function assessmentReport(state,id,{compact=false}={}){
   const gapRows=gaps.map(g=>'<article class="outcome-gap"><strong>'+esc(g.description)+'</strong><p class="help preline">'+esc(g.reason)+'</p>'+button('followup-gap','回看资料与强化',g.id)+'</article>').join('');
   content=(relations.length?'<h3>本次回答涉及的要求</h3>'+rows:'')+(gaps.length?'<h3>这些要求当前仍需处理的薄弱点</h3>'+gapRows:'<p class="help">'+(current?'这些要求目前没有未解决的已记录薄弱点；不代表其他要求已掌握。':'历史结果继续保留。')+'</p>')+'<div class="row">'+home+'</div>';
  }
- return '<section class="assessment-outcome '+(compact?'compact':'')+'" aria-label="考察结果与下一步"><div class="row between"><h3>'+(a.status==='COMPLETED'?'本次考察已结束':'本次考察提前结束')+'</h3><span class="badge">'+(a.mode==='OPEN_BOOK'?'开卷':'闭卷')+(!current?' · 历史要求版本':'')+'</span></div><p class="preline">'+esc(summary)+'</p><p class="help">'+(evidence?'结论对应本次实际回答，后续复习仍需重新验证。':'本次没有形成正式结论证据。')+(!current?' 当前能力要求已变化，请按新版要求继续学习。':'')+'</p>'+content+'</section>';
+ return '<section class="assessment-outcome '+(compact?'compact':'')+'" aria-label="考察结果与下一步"><div class="row between"><h3>'+(a.status==='COMPLETED'?'本次考察已结束':'本次考察提前结束')+'</h3><span class="badge">'+(a.mode==='OPEN_BOOK'?'开卷':'闭卷')+(!current?' · 历史要求版本':'')+'</span></div>'+(a.ended_at?'<p class="help">结束于 '+esc(new Date(a.ended_at).toLocaleString('zh-CN'))+'</p>':'')+'<p class="preline">'+esc(summary)+'</p>'+(commentStatus?'<p class="help" role="status">'+esc(commentStatus)+'</p>':'')+'<p class="help">'+(evidence?'结论对应本次实际回答，后续复习仍需重新验证。':'本次没有形成正式结论证据。')+(!current?' 当前能力要求已变化，请按新版要求继续学习。':'')+'</p>'+actions+content+'</section>';
 
 }
 export function afterDays(days,from=new Date()){const date=new Date(from);date.setDate(date.getDate()+days);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;}

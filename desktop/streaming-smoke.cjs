@@ -11,7 +11,7 @@ exports.run=async(main,base)=>{
  const prefix='## 实时回复\n\n第一段正在生成。',middle='第二段继续补充。',tail='最后一段已经完成。';
  const mock=http.createServer(async(req,res)=>{
   try{let raw='';for await(const chunk of req)raw+=chunk;const body=JSON.parse(raw);requests++;modelsSeen.push(body.model);
-   assert.ok(body.tools.every(t=>t.name.startsWith('mcp__teacher_job__')));
+   assert.ok(body.tools.every(t=>(t.name.startsWith('mcp__teacher_job__')||['web_search','web_fetch'].includes(t.name))));
    const boundary=body.messages.findLastIndex(m=>m.role==='user'&&JSON.stringify(m.content).includes('你是 AI Teacher 的'));
    const used=body.messages.slice(boundary+1).flatMap(m=>Array.isArray(m.content)?m.content:[]).filter(c=>c.type==='tool_use');
    const name=used.length===0?'teacher_get_context':used.length===1?'teacher_reply':null;

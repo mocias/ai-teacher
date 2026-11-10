@@ -1,3 +1,4 @@
+import {goalMaterials} from './resources.js';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const button=(action,label,id)=>`<button type="button" class="small" data-action="${action}" data-id="${esc(id)}">${esc(label)}</button>`;
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
@@ -18,7 +19,7 @@ export function gapPlanActions(state,gap){
 }
 export function remediationScheduleDialog(state,gapId,{api,dialog,toast}){
  const gap=state.learning.gaps.find(g=>g.id===gapId);if(!gap)throw Error('薄弱点不存在');
- const resources=state.resources.filter(r=>r.goal_id===gap.goal_id),related=new Set(state.learning.session_details.filter(d=>d.requirements.includes(gap.requirement_id)&&state.sessions.some(s=>s.id===d.session_id&&s.status!=='REMOVED_FROM_PLAN')).flatMap(d=>d.resources));
+ const resources=goalMaterials(state,gap.goal_id),related=new Set(state.learning.session_details.filter(d=>d.requirements.includes(gap.requirement_id)&&state.sessions.some(s=>s.id===d.session_id&&s.status!=='REMOVED_FROM_PLAN')).flatMap(d=>d.resources));
  const request_id=crypto.randomUUID();
  dialog('安排薄弱点补学',`<h3>${esc(gap.description)}</h3><p class="help preline">${esc(gap.reason)}</p><label for="remediation-activity">这次具体学什么</label><textarea id="remediation-activity" name="activity" rows="3" required maxlength="5000">${esc('回看相关资料，写出「'+gap.description+'」的正确步骤，并独立完成一个例子。')}</textarea><div class="calendar-form-dates"><div><label for="remediation-date">补学日期</label><input id="remediation-date" name="date" type="date" required value="${today()}"></div><div><label for="remediation-duration">预计分钟数</label><input id="remediation-duration" name="duration" type="number" min="1" max="240" required value="20"></div></div><fieldset><legend>本次使用的资料（可选）</legend>${resources.map(r=>`<label class="checkrow"><input type="checkbox" name="resource_${esc(r.id)}" ${related.has(r.id)?'checked':''}>${esc(r.title)}</label>`).join('')||'<p class="help">目标暂无资料，可以先记录练习内容。</p>'}</fieldset><p class="help">保存后出现在首页和日历。完成补学只记录学习进度，仍需新的回答验证薄弱点。</p>`,async data=>{const resource_ids=Object.keys(data).filter(k=>k.startsWith('resource_')).map(k=>k.slice(9));const result=await api('remediation/schedule',{gap_id:gapId,date:data.date,duration:Number(data.duration),activity:data.activity,resource_ids,request_id});toast(result.reused?`已有 ${result.date} 的补学，已保留原安排`:'补学已排入日历，可从首页继续');});
 }

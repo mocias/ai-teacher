@@ -22,14 +22,18 @@ const mock=createServer(async(req,res)=>{
  try{
   let raw='';for await(const part of req)raw+=part;const body=JSON.parse(raw);requests++;requestedModels.push(body.model);
   tools=(body.tools||[]).map(tool=>tool.name);
-  assert.ok(tools.includes('mcp__teacher_job__teacher_get_context'));
-  assert.ok(tools.every(name=>name.startsWith('mcp__teacher_job__')),JSON.stringify(tools));
+  const compaction=tools.length===0;
+  if(!compaction)assert.ok(tools.includes('mcp__teacher_job__teacher_get_context'));
+  assert.ok(tools.every(name=>(name.startsWith('mcp__teacher_job__')||['web_search','web_fetch'].includes(name))),JSON.stringify(tools));
   if(hold){held=true;return;}
   const boundary=body.messages.findLastIndex(m=>m.role==='user'&&(typeof m.content==='string'?m.content.includes('你是 AI Teacher 的'):(m.content||[]).some(c=>c.type==='text'&&c.text?.includes('你是 AI Teacher 的'))));
   if(boundary>0&&JSON.stringify(body.messages.slice(0,boundary)).includes('DSH 本机 MCP 联调通过'))historySeen=true;
   const used=body.messages.slice(boundary+1).flatMap(m=>Array.isArray(m.content)?m.content:[]).filter(c=>c.type==='tool_use');
-  const name=used.length===0?'teacher_get_context':used.length===1?'teacher_reply':null;
-  const block=name?{type:'tool_use',id:'call_'+requests,name:'mcp__teacher_job__'+name,input:name==='teacher_reply'?{content:'DSH 本机 MCP 联调通过'}:{}}:{type:'text',text:'完成'};
+  const master=JSON.stringify(body.messages[boundary]).includes('你是 AI Teacher 的 master');
+  const sequence=master?['teacher_get_context','teacher_get_agent_configuration','teacher_set_agent_configuration','teacher_reply']:['teacher_get_context','teacher_reply'];
+  const name=compaction?null:sequence[used.length]||null;
+  const input=name==='teacher_reply'?{content:'DSH 本机 MCP 联调通过'}:name==='teacher_set_agent_configuration'?{revision:app.store.agents.state().revision,summary:'主 Agent 直接设置普通对话',routes:[{role:'chat',mode:'MCP',harness:'DSH',model:'mock-desktop/alternate-study-model'}]}:{};
+  const block=name?{type:'tool_use',id:'call_'+requests,name:'mcp__teacher_job__'+name,input}:{type:'text',text:compaction?'用户此前已完成上下文读取和答复，继续处理本轮任务。':'完成'};
   res.writeHead(200,{'Content-Type':'text/event-stream'});
   const event=(type,data)=>res.write(`event: ${type}\ndata: ${JSON.stringify({type,...data})}\n\n`);
   event('message_start',{message:{id:'msg_'+requests,type:'message',role:'assistant',model:body.model,content:[],stop_reason:null,stop_sequence:null,usage:{input_tokens:10,output_tokens:0}}});
@@ -51,7 +55,7 @@ try{
  mock.listen(0,'127.0.0.1');await once(mock,'listening');
  const overlay=join(dir,'mock.json');
  const modelHome=join(dir,'dsh');mkdirSync(join(modelHome,'profiles','desktop'),{recursive:true});
- writeFileSync(join(modelHome,'profiles','desktop','cordis.patch.yml'),JSON.stringify([{id:'agent-default-model',config:{provider:'mock-desktop',model:'local-study-model'}},{id:'llm-pi-ai',config:{providers:{'mock-desktop':{api:'anthropic-messages',baseURL:'http://127.0.0.1:'+mock.address().port,apiKeyEnv:'TEACHER_DSH_TEST_KEY',models:[{id:'local-study-model',contextWindow:65536,maxTokens:1024},{id:'alternate-study-model',contextWindow:65536,maxTokens:1024}]}}}}]));
+ writeFileSync(join(modelHome,'profiles','desktop','cordis.patch.yml'),JSON.stringify([{id:'agent-default-model',config:{provider:'mock-desktop',model:'local-study-model'}},{id:'llm-pi-ai',config:{providers:{'mock-desktop':{api:'anthropic-messages',baseURL:'http://127.0.0.1:'+mock.address().port,apiKeyEnv:'TEACHER_DSH_TEST_KEY',models:[{id:'local-study-model',contextWindow:262144,maxTokens:1024},{id:'alternate-study-model',contextWindow:262144,maxTokens:1024}]}}}}]));
  if(pluginMode){
   const profile=join(modelHome,'profiles','desktop'),plugin=join(profile,'node_modules','teacher-fixture-provider');mkdirSync(plugin,{recursive:true});
   const provider=JSON.parse(readFileSync(join(profile,'cordis.patch.yml'),'utf8'))[1].config;
@@ -64,11 +68,12 @@ try{
  writeFileSync(overlay,JSON.stringify([{id:'llm-retry',disabled:true}]));
  const openApp=()=>startServer({port:0,dataDir:join(dir,'teacher'),executorOptions:{intervalMs:1e9},hostOptions:{intervalMs:1e9},harnessOptions:{intervalMs:1e9,timeoutMs:45000,dshSourceHome:modelHome,...(!pluginMode?{readDshModel:route=>resolveDshModel(route,{home:modelHome})}:{modelDirectoryOptions:{probe:options=>probeDshRegistry({...options,spawnProcess:(command,args,opts)=>spawn(command,args,{...opts,env:{...opts.env,TEACHER_DSH_TEST_KEY:'local-test-key'}})})}}),spawnProcess:(command,args,options)=>{
   launches.push({cwd:options.cwd,home:options.env.DSH_HOME,sessionId:args.includes('--session-id')?args[args.indexOf('--session-id')+1]:null});
-  const index=args.includes('--session-id')?args.indexOf('--session-id'):args.indexOf('--json');args.splice(index,0,'--patch',overlay);
+  args.push('--patch',overlay);
   if(pluginMode){const launchPatch=JSON.parse(readFileSync(args[args.indexOf('--patch')+1],'utf8'));const registry=launchPatch.flatMap(r=>r.insert||[]).find(r=>r.id==='teacher-model-registry');assert.equal(registry?.config.plugins.length,1,'plugin execution must load its discovered owner');}
   const child=spawn(command,args,{...options,env:{...options.env,DSH_TELEMETRY_DISABLED:'1',TEACHER_DSH_TEST_KEY:'local-test-key'}});
   // Only this isolated test captures diagnostics; the normal driver discards them.
-  child.stderr.on('data',data=>{diagnostics+=data.toString().slice(0,4000);});child.stdout.on('data',data=>{for(const line of data.toString().split('\n'))try{const e=JSON.parse(line);if(e.type==='error'||e.type==='status'&&e.phase==='turn_end')diagnostics+=JSON.stringify(e);}catch{}});return child;
+  launches.at(-1).pid=child.pid;
+  child.stderr.on('data',data=>{diagnostics+=data.toString().slice(0,4000);});child.stdout.on('data',data=>{for(const line of data.toString().split('\n'))try{const e=JSON.parse(line);if(e.error||e.type==='error'||e.type==='status'&&e.phase==='turn_end')diagnostics+=JSON.stringify(e);}catch{}});return child;
  }}});
  app=openApp();
  await once(app.server,'listening');
@@ -87,21 +92,23 @@ try{
  const cid=intro.conversation_id,originalSession=binding.session_id;
  const waitRun=async(jobId)=>{let record;for(let i=0;i<480;i++){record=app.store.db.prepare('SELECT status,error,tool_calls FROM harness_runs WHERE job_id=? ORDER BY rowid DESC LIMIT 1').get(jobId);if(record&&record.status!=='RUNNING')break;await new Promise(r=>setTimeout(r,100));}assert.equal(record?.status,'COMPLETED',JSON.stringify({record,diagnostics}));return record;};
  const queue=text=>{const sent=app.store.send(cid,text,crypto.randomUUID());app.store.models.tag(sent.job_id);app.harnessDriver.tick();return sent.job_id;};
- const switchIndex=requestedModels.length;app.store.agents.dshModels.save(cid,'mock-desktop/alternate-study-model');await waitRun(queue('第二轮，请沿用本段对话。'));assert.ok(requestedModels.slice(switchIndex).every(m=>m==='alternate-study-model'),'resumed DSH must actually request the newly selected model');assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);assert.equal(launches[1].sessionId,originalSession);assert.equal(launches[1].cwd,launches[0].cwd);assert.ok(historySeen,'DSH must retain earlier durable messages');
+ const firstPid=app.harnessDriver.residentState().find(w=>w.conversation_id===cid).pid;await waitRun(queue('第二轮，保持同一模型继续。'));assert.equal(app.harnessDriver.residentState().find(w=>w.conversation_id===cid).pid,firstPid);assert.equal(launches.length,1,'same configuration must retain one native process');const idleRequests=requests;await new Promise(resolve=>setTimeout(resolve,200));assert.equal(requests,idleRequests,'idle resident must not call a model');
+ const switchIndex=requestedModels.length;app.store.agents.dshModels.save(cid,'mock-desktop/alternate-study-model');await waitRun(queue('第二轮，请沿用本段对话。'));assert.ok(requestedModels.slice(switchIndex).every(m=>m==='alternate-study-model'),'resumed DSH must actually request the newly selected model');assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);assert.notEqual(launches[1].pid,firstPid);assert.equal(launches[1].cwd,launches[0].cwd);assert.ok(historySeen,'DSH must retain earlier durable messages');
  await app.close();app=openApp();await once(app.server,'listening');
- await waitRun(queue('第三轮，重启后继续。'));assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);assert.equal(launches[2].sessionId,originalSession);
+ await waitRun(queue('第三轮，重启后继续。'));assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);assert.notEqual(launches[2].pid,launches[1].pid);
  writeFileSync(join(binding.cwd,'shared-workspace-check.txt'),'shared by AI Teacher conversations');
  app.store.agents.configure({role:'master',mode:'MCP',harness:'DSH',executable});const other=app.store.agents.conversation();const sent=app.store.send(other.conversation_id,'独立对话测试',crypto.randomUUID());app.store.models.tag(sent.job_id);app.harnessDriver.tick();await waitRun(sent.job_id);
  const separate=app.store.agents.dshSessions.get(other.conversation_id);assert.notEqual(separate.session_id,originalSession);assert.equal(separate.cwd,binding.cwd);assert.notEqual(launches[3].home,launches[0].home);
+ assert.equal(app.store.agents.route('chat').model,'mock-desktop/alternate-study-model');assert.equal(app.store.agents.state().configuration_changes.length,1);assert.equal(app.store.agents.state().proposals.length,0);
  assert.equal(readFileSync(join(launches[3].cwd,'shared-workspace-check.txt'),'utf8'),'shared by AI Teacher conversations');
  hold=true;const interrupted=queue('中断后重试同一条消息。');for(let i=0;i<150&&!held;i++)await new Promise(r=>setTimeout(r,100));assert.ok(held);await app.close();hold=false;
  app=openApp();await once(app.server,'listening');assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);app.store.agents.retry({job_id:interrupted});app.harnessDriver.tick();await waitRun(interrupted);assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);
  const current=app.store.agents.dshSessions.get(cid),paths=app.store.agents.dshSessions.paths(current,join(dir,'teacher'));rmSync(join(paths.home,current.log_path));
- assert.equal(app.harnessDriver.checkSession({conversation_id:cid}).state,'RECOVERY_REQUIRED');assert.equal(app.harnessDriver.checkSession({conversation_id:cid,restore:true}).state,'READY');
+ assert.equal((await app.harnessDriver.checkSession({conversation_id:cid})).state,'RECOVERY_REQUIRED');assert.equal((await app.harnessDriver.checkSession({conversation_id:cid,restore:true})).state,'READY');
  await waitRun(queue('检查点恢复后继续。'));assert.equal(app.store.agents.dshSessions.get(cid).session_id,originalSession);
- const oldLog=join(paths.home,app.store.agents.dshSessions.get(cid).log_path);app.harnessDriver.resetSession({conversation_id:cid});await waitRun(queue('明确重建会话后从站内历史继续。'));
+ const oldLog=join(paths.home,app.store.agents.dshSessions.get(cid).log_path);await app.harnessDriver.resetSession({conversation_id:cid});await waitRun(queue('明确重建会话后从站内历史继续。'));
  assert.notEqual(app.store.agents.dshSessions.get(cid).session_id,originalSession);assert.ok(existsSync(oldLog));assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM dsh_session_history WHERE conversation_id=?').get(cid).n,1);
- console.log(JSON.stringify({harness:'DSH',pluginProvider:pluginMode,streamedBeforeWriteback,automaticDetection:!executable,desktopModelInherited:true,sameSessionModelSwitch:true,sameConversationReused:true,restartResumed:true,sharedWorkspace:true,interruptedRetryResumed:true,checkpointRestored:true,explicitRebuildPreservesHistory:true,requests,onlyTeacherTools:tools.every(name=>name.startsWith('mcp__teacher_job__')),assistantReply:true},null,2));
+ const result={harness:'DSH',mainDirectConfiguration:true,pluginProvider:pluginMode,streamedBeforeWriteback,automaticDetection:!executable,desktopModelInherited:true,sameProcessTwoTurns:true,sameSessionModelSwitch:true,sameConversationReused:true,restartResumed:true,sharedWorkspace:true,interruptedRetryResumed:true,checkpointRestored:true,explicitRebuildPreservesHistory:true,requests,onlyTeacherAndWebTools:tools.every(name=>(name.startsWith('mcp__teacher_job__')||['web_search','web_fetch'].includes(name))),assistantReply:true};if(process.env.TEACHER_DSH_SMOKE_RESULT)writeFileSync(process.env.TEACHER_DSH_SMOKE_RESULT,JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
 }finally{
  await app?.close();mock.closeAllConnections();await new Promise(resolve=>mock.close(resolve));rmSync(dir,{recursive:true,force:true});
 }

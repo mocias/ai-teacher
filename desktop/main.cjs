@@ -6,6 +6,11 @@ const {existsSync,readFileSync,writeFileSync,mkdirSync}=require('node:fs');
 let window,child,owned=false,quitting=false,base;
 const root=join(__dirname,'..');
 const smoke=process.argv.includes('--smoke-test');
+if(smoke&&(process.argv.includes('--reader-smoke')||process.argv.includes('--reader-sidebar-smoke')||process.argv.includes('--reader-selection-smoke')||process.argv.includes('--layout-smoke')||process.argv.includes('--reader-tools-smoke')||process.argv.includes('--ui-navigation-smoke')||process.argv.includes('--attachment-smoke')||process.argv.includes('--workflow-return-smoke')||process.argv.includes('--choice-smoke'))){
+ app.commandLine.appendSwitch('disable-features','CalculateNativeWinOcclusion');
+ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+}
+if(smoke&&process.argv.includes('--reader-network-smoke'))app.commandLine.appendSwitch('host-resolver-rules','MAP reader-probe.invalid 127.0.0.1');
 app.setName('AI Teacher');
 if(smoke&&process.env.TEACHER_SMOKE_PROFILE)app.setPath('userData',process.env.TEACHER_SMOKE_PROFILE);
 if(!app.requestSingleInstanceLock()){app.quit();}else{
@@ -26,7 +31,7 @@ async function start(){
   let response;try{response=await fetch('http://127.0.0.1:4317/api/health',{signal:AbortSignal.timeout(1000)});}catch{}
   if(response){let health;try{health=await response.json();}catch{}
    const identity=createHash('sha256').update(process.platform==='win32'?resolve(dataDir).toLowerCase():resolve(dataDir)).digest('hex');
-   if(health?.service!=='ai-teacher'||health.data_id!==identity||!['harness-routing','learning-loop','review-followups','remediation-plans','calendar-recovery','dsh-harness','dsh-discovery','dsh-desktop-model','dsh-sessions','dsh-shared-workspace','chat-markdown-ui','dsh-reply-streaming','workspace-performance','dsh-model-picker','chat-studio-ui','dsh-runtime-models'].every(f=>health.features?.includes(f)))throw Error('端口 4317 已有其他服务或旧版工作台。请先关闭该服务，再打开桌面应用。');
+   if(health?.service!=='ai-teacher'||health.data_id!==identity||!['harness-routing','learning-loop','review-followups','remediation-plans','calendar-recovery','dsh-harness','dsh-discovery','dsh-desktop-model','dsh-sessions','dsh-shared-workspace','chat-markdown-ui','dsh-reply-streaming','workspace-performance','dsh-model-picker','chat-studio-ui','dsh-runtime-models','direct-agent-config','fast-model-catalog','execution-feedback','dsh-web-tools','canonical-v1-learning','stable-editor-input','reliable-task-recovery','quiet-model-catalog','chat-scroll-position','guided-planning-flow','reader-network-recovery','conversation-revisions','task-learning-conversations','collapsible-reader-sidebar','independent-reader-annotations','flexible-workspace-layout','ui-information-layout','chat-file-attachments','contextual-reader-return','clickable-question-choices','choice-teaching-guidance','neutral-question-guidance','resident-dsh-host','automatic-web-search','public-assessment-explanation','assessment-lifecycle','home-profile-conversation'].every(f=>health.features?.includes(f)))throw Error('端口 4317 已有其他服务或旧版工作台。请先关闭该服务，再打开桌面应用。');
    base='http://127.0.0.1:4317';
   }
  }
@@ -39,7 +44,13 @@ async function start(){
   child.on('exit',()=>{if(!quitting){dialog.showErrorBox('服务已停止','请退出并重新打开 AI Teacher。学习数据保存在本机。');app.quit();}});
  }
  window=new BrowserWindow({width:config.width||1380,height:config.height||900,minWidth:960,minHeight:640,title:'AI Teacher · 学习工作台',backgroundColor:'#f7f8fa',show:!smoke,webPreferences:{backgroundThrottling:false,preload:join(__dirname,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
- require('./reader.cjs').installReader({base,main:window});
+ if(smoke)window.webContents.on('console-message',(_event,details)=>{
+  if(details?.level==='error')process.stderr.write('Desktop smoke renderer: '+String(details.message).slice(0,450)+'\n');
+ });
+ const {dshNetwork}=await import('../server/dsh-network.mjs');
+ const readerNetwork=dshNetwork(dataDir);
+ require('./reader.cjs').installReader({base,main:window,getProxy:()=>readerNetwork.get().proxy_url,
+  useProxy:config.readerUseProxy===true,saveProxy:enabled=>{config.readerUseProxy=enabled;save();}});
  window.webContents.setWindowOpenHandler(({url})=>{if(/^https?:\/\//.test(url))shell.openExternal(url);return {action:'deny'};});
  window.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==base){event.preventDefault();if(/^https?:\/\//.test(url))shell.openExternal(url);}});
  window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
@@ -54,10 +65,23 @@ async function start(){
   const result=await window.webContents.executeJavaScript(`new Promise((resolve,reject)=>{const start=Date.now();const tick=setInterval(()=>{if(document.querySelector('#app button')){clearInterval(tick);resolve();}else if(Date.now()-start>10000){clearInterval(tick);reject(Error('UI did not render'));}},100)}).then(()=>fetch('/api/state')).then(r=>{if(!r.ok)throw Error('state '+r.status);return r.json()}).then(s=>({title:document.title,hasApp:!!document.querySelector('#app button'),goals:s.goals?.length,body:document.body.innerText.slice(0,150)}))`);
   if(process.env.TEACHER_SMOKE_OUTPUT){const output=process.env.TEACHER_SMOKE_OUTPUT;mkdirSync(output,{recursive:true});writeFileSync(join(output,'desktop.png'),(await window.webContents.capturePage()).toPNG());writeFileSync(join(output,'result.json'),JSON.stringify({...result,base,servicePid:child?.pid,packaged:app.isPackaged,menus:Menu.getApplicationMenu().items.map(i=>i.label)},null,2));}
   if(process.argv.includes('--reader-smoke'))await require('./reader-smoke.cjs').run(window,base);
+  if(process.argv.includes('--choice-smoke'))await require('./choice-smoke.cjs').run(window,base);
+  if(process.argv.includes('--attachment-smoke'))await require('./attachment-smoke.cjs').run(window,base);
+  if(process.argv.includes('--workflow-return-smoke'))await require('./workflow-return-smoke.cjs').run(window,base);
+  if(process.argv.includes('--reader-tools-smoke'))await require('./reader-tools-smoke.cjs').run(window,base);
+  if(process.argv.includes('--ui-navigation-smoke'))await require('./ui-navigation-smoke.cjs').run(window,base);
+  if(process.argv.includes('--layout-smoke'))await require('./layout-smoke.cjs').run(window,base);
+  if(process.argv.includes('--reader-selection-smoke'))await require('./reader-selection-smoke.cjs').run(window,base);
+  if(process.argv.includes('--reader-sidebar-smoke'))await require('./reader-sidebar-smoke.cjs').run(window,base);
+  if(process.argv.includes('--reader-network-smoke'))await require('./reader-network-smoke.cjs').run(window,base);
   if(process.argv.includes('--streaming-smoke'))await require('./streaming-smoke.cjs').run(window,base);
+  if(process.argv.includes('--input-smoke'))await require('./input-smoke.cjs').run(window,base);
+  if(process.argv.includes('--planning-smoke'))await require('./guided-planning-smoke.cjs').run(window,base);
   if(process.argv.includes('--chat-ui-smoke'))await require('./chat-ui-smoke.cjs').run(window,base);
   if(process.argv.includes('--performance-smoke'))await require('./performance-smoke.cjs').run(window,base);
   if(process.argv.includes('--model-picker-smoke'))await require('./model-picker-smoke.cjs').run(window,base);
+  if(process.argv.includes('--direct-config-smoke'))await require('./direct-config-smoke.cjs').run(window,base);
+  if(process.argv.includes('--feedback-smoke'))await require('./feedback-smoke.cjs').run(window,base);
   if(process.argv.includes('--dsh-smoke'))await require('./dsh-smoke.cjs').run(window);
   if(process.argv.includes('--learning-smoke'))await require('./learning-loop-smoke.cjs').run(window,base);
   console.log('DESKTOP_SMOKE_OK '+JSON.stringify(result));app.quit();

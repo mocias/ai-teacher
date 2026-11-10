@@ -55,3 +55,31 @@ test('cold Qoder starts reuse public model metadata, omit secrets and preserve a
  seedPublicModelCatalogs(source,target,[{id:'llm-qoder'}]);const result=JSON.parse(readFileSync(join(target,file),'utf8'));assert.equal(result.entries[0].id,'Auto');assert.ok(!JSON.stringify(result).includes('secret'));
  writeFileSync(join(target,file),JSON.stringify({version:1,fetchedAt:200,entries:[]}));seedPublicModelCatalogs(source,target,[{id:'llm-qoder'}]);assert.equal(JSON.parse(readFileSync(join(target,file),'utf8')).fetchedAt,200);
 });
+test('picker returns immediately while one background probe is pending and publishes its completed catalog',async t=>{
+ const dir=home(t);plugin(dir);let finish,probes=0,updated;
+ const directory=createDshModelDirectory({home:dir,detect:async()=>({found:true}),probe:()=>{probes++;return new Promise(resolve=>{finish=resolve;});},onUpdate:value=>{updated=value;}});t.after(()=>directory.close());
+ const initial=directory.list();assert.equal(initial instanceof Promise,false);assert.equal(initial.refreshing,true);assert.equal(initial.discovery,'pending');await Promise.resolve();directory.list();assert.equal(probes,1);
+ finish({models:[{provider:'p',model:'one',owner:'llm-example'}]});await directory.refresh();assert.equal(updated.models[0].id,'p/one');assert.equal(updated.refreshing,false);
+});
+
+test('ordinary picker reads reuse an unchanged registry across minutes, manual refresh still probes immediately',async t=>{
+ const dir=home(t);plugin(dir);let probes=0,now=Date.now();
+ t.mock.method(Date,'now',()=>now);
+ const directory=createDshModelDirectory({home:dir,detect:async()=>({found:true}),probe:async()=>{probes++;return {models:[{provider:'p',model:'one'}]};}});
+ t.after(()=>directory.close());await directory.refresh();
+ for(let minute=1;minute<=5;minute++){
+  now+=61000;const snapshot=directory.list();assert.equal(snapshot.refreshing,false);assert.equal(snapshot.models[0].id,'p/one');
+ }
+ assert.equal(probes,1);await directory.refresh({force:true});assert.equal(probes,2);
+ now+=3600000;assert.equal(directory.list().refreshing,true);await directory.refresh();assert.equal(probes,3);
+});
+test('validated models survive restart, stale cache is immediately selectable, and source edits invalidate it',async t=>{
+ const dir=home(t),runtimeHome=join(dir,'runtime'),{profile}=plugin(dir);let probes=0;
+ let directory=createDshModelDirectory({home:dir,runtimeHome,detect:async()=>({found:true}),probe:async()=>{probes++;return {models:[{provider:'p',model:'one',owner:'llm-example',credential:'never-cache'}]};}});
+ await directory.refresh();await directory.close();let finish;
+ directory=createDshModelDirectory({home:dir,runtimeHome,ttlMs:0,detect:async()=>({found:true}),probe:()=>{probes++;return new Promise(resolve=>{finish=resolve;});}});t.after(()=>directory.close());
+ const cached=directory.list();assert.equal(cached.models[0].id,'p/one');assert.equal(cached.stale,true);assert.equal(cached.refreshing,true);await directory.ensureModels(['p/one']);assert.equal(probes,2);
+ const stored=readFileSync(join(runtimeHome,'teacher-model-directory.json'),'utf8');assert.ok(!stored.includes('never-cache'));assert.ok(!stored.includes('entry'));
+ finish({models:[{provider:'p',model:'one',owner:'llm-example'}]});await directory.refresh();writeFileSync(join(profile,'cordis.patch.yml'),JSON.stringify([{id:'llm-example',disabled:true}]));assert.ok(!directory.snapshot().models.some(m=>m.id==='p/one'));
+ const changed=directory.list();assert.equal(changed.refreshing,true);await Promise.resolve();assert.equal(probes,3);finish({models:[]});await directory.refresh();
+});
