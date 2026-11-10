@@ -4,9 +4,9 @@
 
 ## 打开应用
 
-当前版本为 V0.18.0 预发布版。从公开的 [GitHub 发布页](https://github.com/mocias/ai-teacher/releases/tag/v0.18.0) 下载 `ai-teacher-v0.18.0-windows-x64.zip`，完整解压后双击 `AI Teacher-win32-x64/AI Teacher.exe`；无需另装 Node.js。应用不附带模型账号或额度，首次使用到「模型与分工」配置 API 或已安装的模型宿主。
+当前版本为 V0.18.1 预发布版。从公开的 [GitHub 发布页](https://github.com/mocias/ai-teacher/releases/tag/v0.18.1) 下载 `ai-teacher-v0.18.1-windows-x64.zip`，完整解压后双击 `AI Teacher-win32-x64/AI Teacher.exe`；无需另装 Node.js。应用不附带模型账号或额度，首次使用到「模型与分工」配置 API 或已安装的模型宿主。
 
-本地发布成品位于 `outputs/desktop-v0.18.0-release/AI Teacher-win32-x64/AI Teacher.exe`；默认打包目录仍是 `dist`。关闭旧版后打开新版 EXE，沿用原学习数据目录。整个文件夹构成应用，不能只拷贝其中的 EXE，也不要在压缩包里直接运行。V0.14 的对话界面见 [说明](CHAT-UI-V014.md)，V0.14.1 的插件模型接入见 [说明](DSH-MODELS-V0141.md)。
+本地发布成品位于 `outputs/desktop-v0.18.1-release/AI Teacher-win32-x64/AI Teacher.exe`；默认打包目录仍是 `dist`。关闭旧版后打开新版 EXE，沿用原学习数据目录。整个文件夹构成应用，不能只拷贝其中的 EXE，也不要在压缩包里直接运行。V0.14 的对话界面见 [说明](CHAT-UI-V014.md)，V0.14.1 的插件模型接入见 [说明](DSH-MODELS-V0141.md)。
 
 V0.8 的 `node scripts/smoke-desktop.mjs --recovery` 验证重新排期与完整学习闭环，可与 `--packaged` 组合。规则和验收记录见 [V0.8 说明](RECOVERY-V08.md)。
 
@@ -80,3 +80,7 @@ V0.14.1 补齐 DSH 插件模型目录与 headless 执行，详见 [DSH-MODELS-V0
 V0.14.2 允许主 Agent 直接调用配置工具，模型目录使用跨重启缓存和后台刷新；见 [直接设置与列表提速](DIRECT-CONFIG-V0142.md)。
 
 V0.14.3 的交互与联网诊断见 [说明](FEEDBACK-WEB-V0143.md)，验收命令为 `node scripts/smoke-desktop.mjs --feedback`。
+
+## V0.18.1 打包精简
+
+发布时排除浏览器 PDF 阅读不需要的 Node Canvas/Skia、PDF 旧版构建、调试映射、类型声明和依赖测试/示例；开发安装保持完整。Node 运行环境、浏览器 PDF worker、字体、字符映射、WASM 和许可证保留。体积测量与成品后端/PDF 验证见 [PACKAGING](PACKAGING.md)。

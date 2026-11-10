@@ -65,6 +65,7 @@ async function start(){
   const result=await window.webContents.executeJavaScript(`new Promise((resolve,reject)=>{const start=Date.now();const tick=setInterval(()=>{if(document.querySelector('#app button')){clearInterval(tick);resolve();}else if(Date.now()-start>10000){clearInterval(tick);reject(Error('UI did not render'));}},100)}).then(()=>fetch('/api/state')).then(r=>{if(!r.ok)throw Error('state '+r.status);return r.json()}).then(s=>({title:document.title,hasApp:!!document.querySelector('#app button'),goals:s.goals?.length,body:document.body.innerText.slice(0,150)}))`);
   if(process.env.TEACHER_SMOKE_OUTPUT){const output=process.env.TEACHER_SMOKE_OUTPUT;mkdirSync(output,{recursive:true});writeFileSync(join(output,'desktop.png'),(await window.webContents.capturePage()).toPNG());writeFileSync(join(output,'result.json'),JSON.stringify({...result,base,servicePid:child?.pid,packaged:app.isPackaged,menus:Menu.getApplicationMenu().items.map(i=>i.label)},null,2));}
   if(process.argv.includes('--reader-smoke'))await require('./reader-smoke.cjs').run(window,base);
+  if(process.argv.includes('--pdf-smoke'))await require('./pdf-smoke.cjs').run(window,base);
   if(process.argv.includes('--choice-smoke'))await require('./choice-smoke.cjs').run(window,base);
   if(process.argv.includes('--attachment-smoke'))await require('./attachment-smoke.cjs').run(window,base);
   if(process.argv.includes('--workflow-return-smoke'))await require('./workflow-return-smoke.cjs').run(window,base);

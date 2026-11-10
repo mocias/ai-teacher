@@ -1,11 +1,15 @@
 # AI Teacher · 维护交接
 
 - 更新日期：2026-11-10（Asia/Shanghai）
-- 源码版本：0.18.0
+- 源码版本：0.18.1
 
 仓库：[mocias/ai-teacher](https://github.com/mocias/ai-teacher)，公开仓库，主分支 `main`。
 
 本文描述 V0.15.0 的交接基线；运行进程、模型目录、快捷方式和 Release 状态都可能变化，继续工作时应重新核对。源码变更和提交记录以本文件所在 Git 提交为准。
+
+## V0.18.1 依赖精简
+
+打包过滤器在 `scripts/desktop-package-content.mjs`，只裁剪分发内容。依赖目录由 90.8 MB 降至 16.3 MB；ZIP 约 198.4 MB。新增成品 PDF 和后端隔离检查均通过，完整业务回归 339/339。未改教学业务或模型宿主运行方式；V0.18.0 的完整学习流程验收超时仍作为已知限制保留。详见 [PACKAGING](PACKAGING.md) 和 [v0.18.1 Release](https://github.com/mocias/ai-teacher/releases/tag/v0.18.1)。
 
 ## V0.18.0 公开下载
 

@@ -2,14 +2,16 @@
 
 ## 下载使用（Windows）
 
-当前版本 **v0.18.0 预发布版**，源码和 Windows x64 免安装包均公开提供。
+当前版本 **v0.18.1 预发布版**，源码和 Windows x64 免安装包均公开提供。
 
-1. [下载 Windows x64 压缩包](https://github.com/mocias/ai-teacher/releases/download/v0.18.0/ai-teacher-v0.18.0-windows-x64.zip)，或到 [v0.18.0 发布页](https://github.com/mocias/ai-teacher/releases/tag/v0.18.0) 查看更新与校验文件。普通使用者选择 `windows-x64.zip`，无需下载 Source code。
+1. [下载 Windows x64 压缩包](https://github.com/mocias/ai-teacher/releases/download/v0.18.1/ai-teacher-v0.18.1-windows-x64.zip)，或到 [v0.18.1 发布页](https://github.com/mocias/ai-teacher/releases/tag/v0.18.1) 查看更新与校验文件。普通使用者选择 `windows-x64.zip`，无需下载 Source code。
 2. **完整解压**，打开 `AI Teacher-win32-x64` 文件夹，双击 `AI Teacher.exe`。保留整个文件夹；不要直接在压缩包里运行，也不要只复制 EXE。
 3. 打开「模型与分工」，配置自己的模型 API 地址、模型 ID 和 Key；也可选用已安装并配置好的 DSH、Codex 或 Claude Code。程序已内置 Electron 和 Node，无需另外安装 Node.js；不附带模型账号或额度。
 4. 在首页介绍自己的情况、讨论学习目标，再按提示确认学习方案。
 
 学习数据默认保存在 `%APPDATA%\AI Teacher\data`。升级前退出旧版并备份整个数据目录，解压新版到新文件夹后运行；自定义数据目录可在「AI Teacher → 桌面设置」中查看或选择。当前仅提供 Windows x64，尚无代码签名、安装向导和自动更新。详见 [桌面说明](docs/DESKTOP.md)。
+
+V0.18.1 精简发布包中的未使用后端 Canvas/Skia、PDF 旧版构建、调试映射、类型声明和依赖测试/示例，Windows ZIP 从约 221.7 MB 降至 198.4 MB。保留 PDF 阅读、字体和字符映射，以及数据库和模型宿主所用的 Node 运行环境。详见 [打包体积与验证](docs/PACKAGING.md)。
 
 V0.18.0 将 DSH 改为对话级常驻宿主：首次使用后保持进程，后续消息恢复会话并刷新本轮工具权限。未指定搜索服务且没有可用凭据时自动使用公开搜索；考察中的公开讲解通过独立工具发布，私有评价不再被当作用户已看过的教学内容。详见 [运行与反馈说明](docs/RUNTIME-V0180.md)。
 
@@ -39,7 +41,7 @@ V0.15.1 修复中文输入和草稿稳定性、后台重复执行与共享资料
 
 AI Teacher 把目标讨论、资料阅读、学习路线、考察、复习和补学放在同一个本地工作台。学习记录保存在 SQLite 中；模型通过独立 API 连接或 Codex、Claude Code、DSH 宿主完成推理，服务端负责校验、持久化和用户确认。
 
-**当前源码版本：V0.18.0。** 本仓库为公开仓库，配套 Windows 下载包见 [v0.18.0 Release](https://github.com/mocias/ai-teacher/releases/tag/v0.18.0)。也可从源码运行或自行打包。
+**当前源码版本：V0.18.1。** 本仓库为公开仓库，配套 Windows 下载包见 [v0.18.1 Release](https://github.com/mocias/ai-teacher/releases/tag/v0.18.1)。也可从源码运行或自行打包。
 
 维护交接见 [HANDOFF](docs/HANDOFF.md)，桌面使用与构建见 [DESKTOP](docs/DESKTOP.md)。
 
@@ -144,7 +146,7 @@ DSH 会话由 AI Teacher 管理：同一站内对话复用同一 DSH 会话，�
 本地成品沿用原库的启动示例：
 
 ```powershell
-& ".\outputs\desktop-v0.18.0-release\AI Teacher-win32-x64\AI Teacher.exe" "--data-dir=$env:APPDATA\AI Teacher\data"
+& ".\outputs\desktop-v0.18.1-release\AI Teacher-win32-x64\AI Teacher.exe" "--data-dir=$env:APPDATA\AI Teacher\data"
 ```
 
 服务只监听本机，使用页面会话和独立 Agent 凭据区分权限。这是面向可信本机用户的应用，不是公网多用户服务。推理仍可能把当前任务所需内容发送给你选择的模型服务。
@@ -152,11 +154,11 @@ DSH 会话由 AI Teacher 管理：同一站内对话复用同一 DSH 会话，�
 ## 打包 Windows 桌面版
 
 ```powershell
-$env:TEACHER_PACKAGE_OUT = "outputs/desktop-v0.18.0-release"
+$env:TEACHER_PACKAGE_OUT = "outputs/desktop-v0.18.1-release"
 npm run desktop:package
 ```
 
-成品入口为 `outputs/desktop-v0.18.0-release/AI Teacher-win32-x64/AI Teacher.exe`。打包携带执行构建的 Node 运行环境，需在 Windows x64 上构建；详细的许可证缓存、Electron 缓存与成品验证方法见 [桌面说明](docs/DESKTOP.md)。
+成品入口为 `outputs/desktop-v0.18.1-release/AI Teacher-win32-x64/AI Teacher.exe`。打包携带执行构建的 Node 运行环境，需在 Windows x64 上构建；详细的许可证缓存、Electron 缓存与成品验证方法见 [桌面说明](docs/DESKTOP.md)。
 
 目前没有安装向导、代码签名、自动更新、托盘或开机启动功能。桌面快捷方式需指向实际的新成品；源码版本、快捷方式目标和运行服务版本应分别核对。
 
@@ -169,10 +171,11 @@ npm run build
 npm test
 ```
 
-2026-11-10 的 V0.18.0 完整业务回归共 339 项通过。跨目标与教学流程可以用隔离库和本机固定回复模型重现；这不代表所有真实模型和教学效果均已验证。进一步验收按环境选择：
+2026-11-10 的 V0.18.1 完整业务回归共 339 项通过。跨目标与教学流程可以用隔离库和本机固定回复模型重现；这不代表所有真实模型和教学效果均已验证。进一步验收按环境选择：
 
 | 命令 | 验证范围 |
 | --- | --- |
+| `node scripts/smoke-desktop.mjs --packaged --pdf` | 成品 PDF 显示、文本层、翻页、字体/字符映射资源与阅读位置保存 |
 | `node scripts/smoke-desktop.mjs --canonical` | 两个学习目标、原回答引用、路线、复习、材料冲突与考察交互 |
 | `node scripts/smoke-desktop.mjs --model-picker` | 五个对话入口、功能默认模型、刷新保留与窄窗口 |
 | `node scripts/smoke-desktop.mjs --chat-ui` | 聊天排版、输入、草稿与滚动交互 |

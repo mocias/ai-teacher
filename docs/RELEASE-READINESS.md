@@ -1,3 +1,7 @@
+# V0.18.1 预发布更新
+
+2026-11-10：精简依赖分发，Windows ZIP 约 198.4 MB。完整业务回归 339/339，成品布局、PDF 和 HTTP/stdio 后端连接及持久化检查通过。详情见 [PACKAGING](PACKAGING.md)，附件见 [v0.18.1 Release](https://github.com/mocias/ai-teacher/releases/tag/v0.18.1)。以下 V0.18.0 记录保留为历史基线，其中完整学习端到端超时仍是已知限制。
+
 # V0.18.0 公开预发布检查
 
 日期：2026-11-10（Asia/Shanghai）。公开仓库 `mocias/ai-teacher`，发布源码与 Windows x64 免安装 ZIP。下载无需仓库邀请；这是预发布版，尚无代码签名、安装向导或自动更新。
